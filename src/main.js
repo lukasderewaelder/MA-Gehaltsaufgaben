@@ -1,5 +1,6 @@
 // Startpunkt: Service Worker einrichten und die App starten.
 import { startApp } from './app.js';
+import { toast } from './ui.js';
 
 function setupServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
@@ -40,6 +41,18 @@ function setupServiceWorker() {
 }
 
 setupServiceWorker();
+
+// Unerwartete Fehler nicht stumm lassen: kurze Meldung, Einzelheiten in der Konsole (gleiche Meldung höchstens alle 10 s)
+let letzteMeldung = { text: '', zeit: 0 };
+function meldeFehler(err) {
+  console.error(err);
+  const text = String(err?.message ?? err ?? 'Unbekannter Fehler').slice(0, 120);
+  if (text === letzteMeldung.text && Date.now() - letzteMeldung.zeit < 10_000) return;
+  letzteMeldung = { text, zeit: Date.now() };
+  toast(`Unerwarteter Fehler: ${text}. Die Zettel sind gespeichert; bei Problemen die Seite neu laden.`, { ms: 9000 });
+}
+window.addEventListener('error', (e) => meldeFehler(e.error ?? e.message));
+window.addEventListener('unhandledrejection', (e) => meldeFehler(e.reason));
 
 startApp().catch((err) => {
   console.error(err);

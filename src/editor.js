@@ -8,7 +8,8 @@ import { erzeugeFall, randomSeed } from './generators/faelle.js';
 import { BEITRAEGE, RUECK_TYPEN, STUNDEN_ARTEN, rueckPlan } from './rueck.js';
 import { esc, feldName, renderSlip } from './slip.js';
 import { $, toast } from './ui.js';
-import { PAGE_W, fitPages, gesuchteFelder, renderBlatt, sachtextAuto, teilText, teilaufgaben, verfuegbareFelder } from './worksheet.js';
+import { PAGE_W, fitPages, gesuchteFelder, sachtextAuto, teilText, teilaufgaben, verfuegbareFelder } from './worksheet.js';
+import { renderSeiten } from './yearsheet.js';
 
 const SLIP_WIDTH = PAGE_W; // A4 bei 96 dpi
 
@@ -16,6 +17,8 @@ const PANE_HINWEIS = {
   zettel: 'Auf einen Wert im Zettel tippen, um ihn von Hand zu ändern und den Rechenweg zu sehen.',
   arbeit: 'Auf einen Wert tippen: gesucht (bleibt leer) oder angegeben. Leere Linien sind die gesuchten Werte.',
   loesung: 'Grün hinterlegt sind die gesuchten Werte. Auf einen Wert tippen schaltet „gesucht“ um.',
+  'jahr-arbeit': 'Jahresübersicht als Aufgabe: Welche Teile Lücken sind, stellst du im Formular unter „Jahresübersicht“ ein.',
+  'jahr-loesung': 'Jahresübersicht mit Lösung: Grün hinterlegt sind die Werte, die im Aufgabenblatt fehlen.',
 };
 
 const getAt = (obj, path) => path.split('.').reduce((a, k) => a?.[k], obj);
@@ -116,6 +119,22 @@ function aufgabeForm(fall, r) {
   </details>`;
 }
 
+function jahrForm(fall) {
+  const jb = fall.jahresblatt;
+  return `<details><summary>Jahresübersicht</summary>
+    ${input('Überschrift', 'jahresblatt.titel', 'text', fall, `placeholder="Jahresübersicht ${fall.jahr}"`)}
+    <p class="muted">Diese Teile der Tabelle sind im Aufgabenblatt Lücken (Ansichten „Jahr: Aufgabe“ und „Jahr: Lösung“):</p>
+    ${check('Jahressummen', 'jahresblatt.luecken.summen', fall)}
+    ${check('Durchschnitt je Monat', 'jahresblatt.luecken.durchschnitt', fall)}
+    ${check('Anteile am Brutto in Prozent', 'jahresblatt.luecken.quoten', fall)}
+    ${check('Netto jedes Monats', 'jahresblatt.luecken.netto', fall)}
+    ${check('Diagramm anzeigen', 'jahresblatt.diagramm', fall)}
+    ${select('Vergleich', 'jahresblatt.vergleich', [['aus', 'Kein Vergleich'], ['klassen', 'Alle Steuerklassen'], ['paar', 'Ehepaar: III/V, IV/IV, V/III']], fall)}
+    ${jb.vergleich === 'paar' ? input('Gehalt Partner/in (€ je Monat)', 'jahresblatt.partner', 'money', fall) : ''}
+    <p class="muted">Sonderzahlungen gelten nur in dem Monat, der im Zettel steht. Alle anderen Monate haben das gleiche laufende Gehalt.</p>
+  </details>`;
+}
+
 function formHtml(fall, r) {
   const monate = MONATE.map((m, i) => [i + 1, m]);
   const jahre = YEARS.map((y) => [y, y]);
@@ -149,6 +168,7 @@ function formHtml(fall, r) {
     <p class="muted">Die Tabelle und die Rechnung nach Tarif sind vereinfacht und weichen von der amtlichen Lohnsteuer um wenige Euro ab.</p>
   </details>
   ${aufgabeForm(fall, r)}
+  ${jahrForm(fall)}
   <details><summary>Aussehen und weitere Blöcke</summary>
     ${select('Optik', 'anzeige.optik', [['modern', 'Klar und modern'], ['original', 'Originalgetreu (Matrixdruck-Stil)']], fall)}
     ${check('Erklärmodus: nummerierte Marken und Legende', 'anzeige.erklaermodus', fall)}
@@ -179,7 +199,7 @@ export function createEditor(app) {
     if (pane === 'zettel') {
       slipHost.innerHTML = renderSlip(fall, r, { interactive: true });
     } else {
-      pagesHost.innerHTML = renderBlatt(fall, r, { modus: pane, interactive: true });
+      pagesHost.innerHTML = renderSeiten(fall, { modus: pane, interactive: true });
       fitPages(pagesHost);
       const ueber = pagesHost.querySelectorAll('.page.is-overflow').length;
       $('#pane-hint').textContent = `${PANE_HINWEIS[pane]}${ueber ? ' Achtung: Rot umrandete Seiten sind zu voll – weniger Teilaufgaben oder weniger Zeilen wählen.' : ''}`;
@@ -194,15 +214,38 @@ export function createEditor(app) {
     pagesHost.style.zoom = String(scale);
   }
 
+  const tabs = [...document.querySelectorAll('.pane-bar [data-pane]')];
   function setPane(next) {
     pane = next;
     root.dataset.pane = pane;
-    document.querySelectorAll('.pane-bar [data-pane]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.pane === pane)));
+    for (const b of tabs) {
+      const aktiv = b.dataset.pane === pane;
+      b.setAttribute('aria-selected', String(aktiv));
+      b.tabIndex = aktiv ? 0 : -1;
+    }
+    const panel = pane === 'zettel' ? slipHost : pagesHost;
+    slipHost.removeAttribute('aria-labelledby');
+    pagesHost.removeAttribute('aria-labelledby');
+    panel.setAttribute('aria-labelledby', `tab-${pane}`);
     $('#pane-hint').textContent = PANE_HINWEIS[pane];
     if (fall) renderSlipNow();
   }
   root.dataset.pane = pane;
-  document.querySelectorAll('.pane-bar [data-pane]').forEach((b) => b.addEventListener('click', () => setPane(b.dataset.pane)));
+  slipHost.setAttribute('role', 'tabpanel');
+  pagesHost.setAttribute('role', 'tabpanel');
+  tabs.forEach((b) => {
+    b.id = `tab-${b.dataset.pane}`;
+    b.addEventListener('click', () => setPane(b.dataset.pane));
+    // Tastatur wie bei Registerkarten: Pfeile, Anfang und Ende
+    b.addEventListener('keydown', (e) => {
+      const i = tabs.indexOf(b);
+      const ziel = { ArrowRight: tabs[(i + 1) % tabs.length], ArrowLeft: tabs[(i - 1 + tabs.length) % tabs.length], Home: tabs[0], End: tabs.at(-1) }[e.key];
+      if (!ziel) return;
+      e.preventDefault();
+      setPane(ziel.dataset.pane);
+      ziel.focus();
+    });
+  });
 
   function renderForm() {
     const open = new Map([...formHost.querySelectorAll('details')].map((d) => [d.querySelector('summary').textContent, d.open]));
@@ -295,7 +338,7 @@ export function createEditor(app) {
     const value = readValue(el);
     if (value === null) return;
     setAt(fall, el.dataset.bind, value);
-    if (el.dataset.bind === 'person.minijob' || el.dataset.bind.startsWith('anzeige.') || el.dataset.bind === 'steuer.modus') {
+    if (el.dataset.bind === 'person.minijob' || el.dataset.bind.startsWith('anzeige.') || el.dataset.bind === 'steuer.modus' || el.dataset.bind === 'jahresblatt.vergleich') {
       normalizeInPlace();
       changed({ form: true });
       return;
@@ -413,8 +456,8 @@ export function createEditor(app) {
   });
   $('#pdf-go').addEventListener('click', async () => {
     const was = pdfDlg.querySelector('input[name="pdf-was"]:checked').value;
-    const modi = was === 'beide' ? ['arbeit', 'loesung'] : [was];
-    const teil = { beide: '', arbeit: ' – Arbeitsblatt', loesung: ' – Lösungsblatt' }[was];
+    const modi = was === 'beide' ? ['arbeit', 'loesung'] : was === 'jahr' ? ['jahr-arbeit', 'jahr-loesung'] : [was];
+    const teil = { beide: '', arbeit: ' – Arbeitsblatt', loesung: ' – Lösungsblatt', jahr: ' – Jahresübersicht' }[was];
     $('#pdf-go').disabled = true;
     pdfButtons(false);
     pdfStatus('PDF wird erstellt …');

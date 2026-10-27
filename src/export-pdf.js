@@ -1,7 +1,7 @@
 // PDF-Export: jede A4-Seite -> Canvas (html2canvas) -> JPEG -> PDF-Seite (jsPDF).
 // Die Seiten werden außerhalb des Bildschirms aufgebaut und dort in den Zettel eingepasst; die sichtbare Vorschau bleibt unberührt.
-import { berechne } from './calc/payroll.js';
-import { PAGE_H, PAGE_W, fitPages, renderBlatt } from './worksheet.js';
+import { PAGE_H, PAGE_W, fitPages } from './worksheet.js';
+import { renderSeiten } from './yearsheet.js';
 
 const LIBS = {
   html2canvas: 'vendor/html2canvas/html2canvas.min.js',
@@ -100,11 +100,10 @@ async function renderCanvas(pageEl, scales) {
 
 /** Baut die gewünschten Blätter ('arbeit', 'loesung') unsichtbar auf und gibt { stage, pages } zurück. */
 function buildStage(fall, modi) {
-  const r = berechne(fall);
   const stage = document.createElement('div');
   stage.setAttribute('aria-hidden', 'true');
   stage.style.cssText = `position:fixed;left:-10000px;top:0;width:${PAGE_W}px;pointer-events:none`;
-  stage.innerHTML = modi.map((modus) => renderBlatt(fall, r, { modus })).join('');
+  stage.innerHTML = modi.map((modus) => renderSeiten(fall, { modus })).join('');
   document.body.append(stage);
   const pages = [...stage.querySelectorAll('.page')];
   pages.forEach((p, i) => {
@@ -117,7 +116,7 @@ function buildStage(fall, modi) {
 }
 
 /**
- * Erzeugt das PDF (A4 hoch). `modi`: ['arbeit'], ['loesung'] oder beide.
+ * Erzeugt das PDF (A4 hoch). `modi`: 'arbeit', 'loesung', 'jahr-arbeit', 'jahr-loesung' (eine oder mehrere, in der Reihenfolge).
  * Skalierungen werden der Reihe nach versucht, damit schwächere Geräte statt eines leeren PDFs eine gröbere Fassung bekommen.
  * Gibt { blob, seiten, ms, ueberlaufen } zurück; `ueberlaufen` = Seiten, auf denen der Zettel zu stark verkleinert werden musste.
  */

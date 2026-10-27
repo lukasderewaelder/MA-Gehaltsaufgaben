@@ -66,10 +66,12 @@
           <button type="button" role="tab" data-pane="zettel" aria-selected="true">Zettel</button>
           <button type="button" role="tab" data-pane="arbeit" aria-selected="false">Arbeitsblatt</button>
           <button type="button" role="tab" data-pane="loesung" aria-selected="false">Lösungsblatt</button>
+          <button type="button" role="tab" data-pane="jahr-arbeit" aria-selected="false">Jahr: Aufgabe</button>
+          <button type="button" role="tab" data-pane="jahr-loesung" aria-selected="false">Jahr: Lösung</button>
           <span class="spacer"></span>
           <button type="button" id="ed-pdf" class="btn btn-small">PDF erstellen …</button>
         </div>
-        <p id="pane-hint" class="hint"></p>
+        <p id="pane-hint" class="hint" aria-live="polite"></p>
         <div id="slip-host"></div>
         <div id="pages-host"></div>
       </section>
@@ -153,6 +155,7 @@
       <label><input type="radio" name="pdf-was" value="beide" checked> Arbeitsblatt und Lösungsblatt (eine Datei)</label>
       <label><input type="radio" name="pdf-was" value="arbeit"> Nur Arbeitsblatt</label>
       <label><input type="radio" name="pdf-was" value="loesung"> Nur Lösungsblatt</label>
+      <label><input type="radio" name="pdf-was" value="jahr"> Jahresübersicht (Aufgabe und Lösung)</label>
     </fieldset>
     <p id="pdf-status" class="meldung" role="status" hidden></p>
     <div class="dlg-actions">
@@ -172,6 +175,7 @@
     <div class="dlg-actions dlg-left">
       <button type="button" class="btn btn-primary" id="backup-export">Sicherung erstellen</button>
       <button type="button" class="btn" id="backup-share" hidden>Teilen …</button>
+      <button type="button" class="btn" id="backup-download" hidden>Herunterladen</button>
       <label class="btn file-btn">Datei einlesen<input id="backup-import" type="file" accept="application/json,.json"></label>
     </div>
     <p id="backup-meldung" class="meldung" role="status" hidden></p>

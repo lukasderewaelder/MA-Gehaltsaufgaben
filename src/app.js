@@ -138,6 +138,7 @@ export async function startApp() {
       meldung('');
       deliverable = null;
       $('#backup-share').hidden = true;
+      $('#backup-download').hidden = true;
       $('#backup-info').textContent = `${app.faelle.length} Zettel gespeichert.`;
       dlg.showModal();
     },
@@ -148,13 +149,15 @@ export async function startApp() {
     await app.setSettings({ lastBackupAt: Date.now(), changesSinceBackup: 0 });
     if (deliverable.canShare) {
       $('#backup-share').hidden = false;
-      meldung('Sicherung erstellt. Über „Teilen“ in Dateien, OneDrive oder AirDrop ablegen.');
+      $('#backup-download').hidden = false;
+      meldung('Sicherung erstellt. Über „Teilen“ in Dateien, OneDrive oder AirDrop ablegen oder „Herunterladen“.');
     } else {
       deliverable.download();
       meldung('Sicherung wurde heruntergeladen.');
     }
     library.renderReminder();
   });
+  $('#backup-download').addEventListener('click', () => deliverable?.download());
   $('#backup-share').addEventListener('click', async () => {
     if (deliverable && (await deliverable.share())) meldung('Geteilt.');
   });
@@ -185,5 +188,10 @@ export async function startApp() {
   $('#lib-zufall').addEventListener('click', () => zufall.open());
   await app.refreshFaelle();
   await route();
+  // Beim Wechsel der App (iPad) oder Schließen sofort speichern, nicht erst nach der kurzen Verzögerung
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') editor.flush().catch(() => {});
+  });
+  window.addEventListener('pagehide', () => editor.flush().catch(() => {}));
   window.__lohnzettel = { app, getFall: () => editor.getFall(), flush: () => editor.flush() };
 }

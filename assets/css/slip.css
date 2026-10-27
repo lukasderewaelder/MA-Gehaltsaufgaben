@@ -57,7 +57,7 @@
 /* Erklärmodus: nummerierte Marken und Legende */
 .marke {
   display: inline-block; min-width: 17px; height: 17px; padding: 0 4px; margin-left: 5px; border-radius: 9px;
-  background: #ea580c; color: #fff; font: 700 10px/17px system-ui, sans-serif; text-align: center; vertical-align: middle;
+  background: #c2410c; color: #fff; font: 700 10px/17px system-ui, sans-serif; text-align: center; vertical-align: middle;
   text-transform: none; letter-spacing: 0;
 }
 .legende ol { list-style: none; margin: 4px 0 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 3px 16px; }

@@ -127,6 +127,20 @@ function normalizeRueck(raw) {
   return { typ, param: params[typ] ? oneOf(raw.param, params[typ], params[typ][0]) : '' };
 }
 
+/** Jahresübersicht: welche Teile Lücken sind, Diagramm, Vergleich (aus / Steuerklassen / Ehepaar) und das Gehalt des Partners. */
+function normalizeJahresblatt(raw) {
+  const j = raw && typeof raw === 'object' ? raw : {};
+  const l = j.luecken && typeof j.luecken === 'object' ? j.luecken : {};
+  const b = (v, d) => (typeof v === 'boolean' ? v : d);
+  return {
+    luecken: { summen: b(l.summen, true), durchschnitt: b(l.durchschnitt, true), quoten: b(l.quoten, true), netto: b(l.netto, false) },
+    diagramm: b(j.diagramm, true),
+    vergleich: oneOf(j.vergleich, ['aus', 'klassen', 'paar'], 'aus'),
+    partner: num(j.partner, 150000, 0, 2_000_000),
+    titel: str(j.titel),
+  };
+}
+
 /** Zufallsfall-Einstellungen (nur wenn der Fall erzeugt wurde, damit „Neu würfeln“ möglich ist); null sonst. */
 function normalizeZufall(raw) {
   if (!raw || typeof raw !== 'object') return null;
@@ -214,6 +228,7 @@ export function normalizeFall(raw) {
     },
     aufgabe: normalizeAufgabe(raw.aufgabe),
     zufall: normalizeZufall(raw.zufall),
+    jahresblatt: normalizeJahresblatt(raw.jahresblatt),
     hinweis: str(raw.hinweis),
     fehltage: { urlaub: num(raw.fehltage?.urlaub, 0, 0, 366), krank: num(raw.fehltage?.krank, 0, 0, 366) },
     bank: { name: str(raw.bank?.name), iban: str(raw.bank?.iban) },

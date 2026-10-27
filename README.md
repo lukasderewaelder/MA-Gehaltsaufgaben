@@ -4,7 +4,7 @@ Lohn- und Gehaltszettel für den Mathe-Unterricht (Klasse 8–10): angelehnt an 
 
 ## Stand
 
-**M0 bis M5 fertig** (Rechenkern, Zettel-Editor, Bibliothek, Sicherung, Arbeits- und Lösungsblatt mit PDF, Zufallsfälle, Rückwärtsaufgaben, Vorführ- und Erklärmodus). Der Plan mit allen Meilensteinen steht in `C:\Users\luk-e\.claude\plans\plane-eine-interaktive-html-anwendung-frolicking-sloth.md`.
+**M0 bis M6 fertig** (Rechenkern, Zettel-Editor, Bibliothek, Sicherung, Arbeits- und Lösungsblatt mit PDF, Zufallsfälle, Rückwärtsaufgaben, Vorführ- und Erklärmodus, Jahresübersicht, Härtung). Der Plan mit allen Meilensteinen steht in `C:\Users\luk-e\.claude\plans\plane-eine-interaktive-html-anwendung-frolicking-sloth.md`.
 
 | Meilenstein | Inhalt | Stand |
 |---|---|---|
@@ -14,7 +14,7 @@ Lohn- und Gehaltszettel für den Mathe-Unterricht (Klasse 8–10): angelehnt an 
 | M3 | Arbeitsblatt/Lösungsblatt, Teilaufgaben, PDF/Teilen, Beiblatt Merkzettel | fertig |
 | M4 | Zufallsfälle, Rückwärtsaufgaben | fertig |
 | M5 | Vorführmodus, Erklärmodus (Marken 1–10) | fertig |
-| M6 | Jahresübersicht, Härtung, Barrierefreiheit | offen |
+| M6 | Jahresübersicht, Härtung, Barrierefreiheit, Browser-Tests | fertig |
 
 ## Benutzung
 
@@ -30,6 +30,7 @@ Lohn- und Gehaltszettel für den Mathe-Unterricht (Klasse 8–10): angelehnt an 
 - **Zufallsfall** (Übersicht): drei Stufen – *leicht* (runde Zahlen, feste Prozentsätze), *mittel* (echte Sätze, Lohnsteuertabelle), *schwer* (Zuschläge, Sonderzahlung, alle Steuerklassen). Darunter einzeln schaltbar: runde Zahlen, Zuschläge, Sonderzahlung, Kirchensteuer, Kinder, Verdienst über der Beitragsgrenze, Minijob, Steuerklassen, Lohnsteuer-Art, Aufgabe (alles, Abzüge und Netto, Sozialversicherung, Steuern, Brutto). **Gleicher Startwert = gleicher Fall.** Bei mehreren **Gruppen** (A, B, …) bleiben Beruf, Firma, Posten und Steuerklasse gleich, nur die Zahlen und Namen ändern sich – für Klassenarbeiten. Im Editor erzeugt **Neu würfeln** einen neuen Fall mit denselben Einstellungen (mit Rückgängig).
 - **Rückwärtsaufgaben** (Formular „Arbeitsblatt“ → Aufgabenrichtung): *Beitrag und Satz → Brutto* (alle Brutto-Werte sind Lücken), *Betrag und Stunden → Stundenlohn* (oder Stunden, Zuschlagssatz; Menge, Faktor und Prozentsatz sind als Lücken wählbar), *Netto und Abzugsquote → Brutto* und *Wunsch-Netto → nötiges Brutto durch Probieren* (diese beiden ohne Zettel, mit Versuchstabelle; das Lösungsblatt zeigt die Versuche).
 - **Vorführen** (Knopf im Editor, `#/vorfuehren/<id>`): der Zettel groß für Beamer oder iPad. Gesuchte Werte sind blau verdeckt (Verdeckt: gesuchte Werte, alle Ergebnisse oder nichts) und werden durch Tippen aufgedeckt. Ein Tipp auf einen sichtbaren Wert zeigt den **Rechenweg in drei Schritten** (Zutaten gelb markiert, Rechnung, Ergebnis; „Weiter“ oder Pfeiltasten). Oben **Zoom** auf Kopf, Bezüge, Steuer und SV oder Ergebnis, **Vollbild** und **Erklärmodus**.
+- **Jahresübersicht** (Ansichten „Jahr: Aufgabe“ und „Jahr: Lösung“, Formular „Jahresübersicht“): zwölf Monate mit Brutto, Lohnsteuer, Soli, Kirchensteuer, den vier Beiträgen und Netto, dazu Summe, Durchschnitt je Monat und Anteil am Brutto. Welche Teile im Aufgabenblatt **Lücken** sind (Summen, Durchschnitt, Anteile, Netto jedes Monats), stellst du ein; das Lösungsblatt zeigt sie grün. Dazu ein **Balkendiagramm** (Netto und Abzüge je Monat), die Teilaufgaben mit Lösung und wahlweise ein **Vergleich**: alle Steuerklassen oder ein Ehepaar in III/V, IV/IV und V/III (Gehalt der Partnerin oder des Partners einstellbar). Eine Sonderzahlung gibt es nur in dem Monat, der im Zettel steht; alle anderen Monate haben das gleiche laufende Gehalt. Im PDF-Dialog: „Jahresübersicht (Aufgabe und Lösung)“.
 - **Erklärmodus** (Formular „Aussehen“, auch im Vorführmodus): nummerierte Marken (Grundzettel 1–10, mit zugeschalteten Blöcken mehr) und eine Legende in Schülersprache; wirkt auch im Arbeitsblatt, Lösungsblatt und PDF.
 
 ## Rechenkern (`src/calc/`)
@@ -44,12 +45,28 @@ Lohn- und Gehaltszettel für den Mathe-Unterricht (Klasse 8–10): angelehnt an 
 ## Entwickeln
 
 ```bash
-npm test                       # Unit-Tests (Rechenkern, Modell, Sicherung, Precache)
+npm install                    # einmal: installiert Playwright für die Browser-Tests
+npm run test:e2e               # Browser-Tests mit dem installierten Edge (PW_CHANNEL=chrome für Chrome)
+npm test                       # Unit-Tests (Rechenkern, Modell, Sicherung, Precache, Kontrast)
 node tools/precache.mjs        # nach neuen/geänderten Dateien: sw.js aktualisieren (sonst schlägt npm test fehl)
 node tools/serve.mjs 4180      # lokaler Server, http://localhost:4180/
 ```
 
 Auf localhost ist der Service Worker aus (`?sw=1` schaltet ihn ein). Neue Dateien in `src/` oder `assets/` → `node tools/precache.mjs`.
+
+## Härtung und Barrierefreiheit (M6)
+
+- **Speichern:** Änderungen werden nach 0,4 s gespeichert und sofort, wenn die App in den Hintergrund geht oder geschlossen wird (iPad: App-Wechsel). Ist IndexedDB nicht nutzbar (z. B. privates Fenster), arbeitet die App im Arbeitsspeicher und zeigt eine Warnung.
+- **Fehler:** Unerwartete Fehler erscheinen als kurze Meldung (Einzelheiten in der Konsole); eine kaputte Sicherungsdatei, ein fehlgeschlagenes PDF und ein volles Blatt (rot umrandet) haben eigene verständliche Meldungen.
+- **Bedienung:** Registerkarten mit Pfeiltasten, Anfang und Ende (`role="tablist"`), sichtbarer Fokus überall, Touch-Ziele mindestens 40–44 px, `prefers-reduced-motion` schaltet Bewegung ab, Diagramm mit Bildbeschreibung, Dialoge mit Überschrift, alle Formularfelder mit Beschriftung.
+- **Farben:** Alle Text-/Hintergrund-Paare erreichen mindestens 4,5 : 1 (WCAG AA); `tests/kontrast.test.mjs` rechnet das aus den CSS-Werten nach.
+- **Tests:** 69 Unit-Tests und 10 Browser-Tests (Anlegen, Ändern, Neuladen, Arbeits-/Lösungsblatt, PDF-Download, Zufall, Rückwärts, Vorführen, Jahr, Sicherung, Tastatur, schmaler Bildschirm; jeweils ohne Konsolenfehler und ohne fremde Netzanfragen).
+
+## iPad-Checkliste (M6)
+
+1. Jahresübersicht: in den Ansichten „Jahr: Aufgabe“ und „Jahr: Lösung“ blättern, Vergleich „Ehepaar“ einschalten, PDF „Jahresübersicht“ teilen.
+2. Zwischen Safari und einer anderen App wechseln, zurückkehren: die letzte Änderung ist noch da.
+3. Hochkant und quer drehen: Editor, Vorführmodus und Jahresübersicht laufen nicht seitlich aus dem Bild.
 
 ## iPad-Checkliste (M4 und M5)
 
