@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Lohnzettel-Werkstatt</title>
+  <meta name="description" content="Lohn- und Gehaltszettel für den Mathe-Unterricht bauen – vereinfacht, offline, am PC und am iPad.">
+  <meta name="theme-color" content="#2563eb">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" href="assets/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Lohnzettel">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="stylesheet" href="assets/css/app.css">
+  <link rel="stylesheet" href="assets/css/slip.css">
+  <link rel="stylesheet" href="assets/css/blatt.css">
+  <link rel="stylesheet" href="assets/css/print.css" media="print">
+  <script type="module" src="src/main.js"></script>
+</head>
+<body data-view="loading">
+  <div id="update-banner" class="banner" role="status" hidden>
+    <span>Eine neue Version ist bereit.</span>
+    <button type="button" class="btn btn-small" id="btn-update">Jetzt aktualisieren</button>
+  </div>
+  <div id="storage-banner" class="banner banner-warn" role="alert" hidden>
+    Speichern im Browser ist hier nicht möglich (z. B. privates Fenster). Änderungen gehen beim Schließen verloren.
+  </div>
+
+  <!-- Bibliothek -->
+  <div id="view-library">
+    <header class="libbar">
+      <h1 class="brand">Lohnzettel-Werkstatt</h1>
+      <span class="spacer"></span>
+      <button type="button" id="lib-backup" class="btn">Sicherung</button>
+      <button type="button" id="lib-neu" class="btn btn-primary">Neuer Zettel</button>
+    </header>
+    <div id="backup-reminder" class="banner banner-info" hidden>
+      <span id="backup-reminder-text"></span>
+      <button type="button" class="btn btn-small" id="backup-reminder-open">Jetzt sichern</button>
+    </div>
+    <main class="lib-main">
+      <p id="lib-empty" class="empty" hidden>Noch keine Zettel. Mit „Neuer Zettel“ aus einem Szenario starten.</p>
+      <ul id="lib-list" class="cards"></ul>
+    </main>
+  </div>
+
+  <!-- Editor -->
+  <div id="view-editor">
+    <header class="edbar">
+      <button type="button" id="ed-back" class="btn">← Übersicht</button>
+      <input id="ed-titel" class="ed-titel" type="text" aria-label="Titel des Zettels" autocomplete="off">
+      <span class="spacer"></span>
+      <button type="button" id="ed-reset" class="btn" title="Alle von Hand geänderten Felder wieder automatisch rechnen">Felder zurücksetzen</button>
+      <button type="button" id="ed-dup" class="btn">Duplizieren</button>
+      <button type="button" id="ed-print" class="btn btn-primary">Drucken</button>
+    </header>
+    <div class="ed-body">
+      <aside id="editor-form" class="ed-form" aria-label="Eingaben"></aside>
+      <section id="editor-preview" class="ed-preview" aria-label="Vorschau">
+        <div class="pane-bar" role="tablist" aria-label="Ansicht">
+          <button type="button" role="tab" data-pane="zettel" aria-selected="true">Zettel</button>
+          <button type="button" role="tab" data-pane="arbeit" aria-selected="false">Arbeitsblatt</button>
+          <button type="button" role="tab" data-pane="loesung" aria-selected="false">Lösungsblatt</button>
+          <span class="spacer"></span>
+          <button type="button" id="ed-pdf" class="btn btn-small">PDF erstellen …</button>
+        </div>
+        <p id="pane-hint" class="hint"></p>
+        <div id="slip-host"></div>
+        <div id="pages-host"></div>
+      </section>
+    </div>
+  </div>
+
+  <!-- Neuer Zettel -->
+  <dialog id="dlg-neu" aria-labelledby="neu-titel">
+    <h2 id="neu-titel">Neuer Zettel</h2>
+    <button type="button" class="szenario szenario-leer" data-leer><b>Leerer Zettel</b><span>Standardwerte, alles selbst eintragen</span></button>
+    <h3>Oder mit einem Szenario beginnen</h3>
+    <ul id="neu-liste" class="szenarien"></ul>
+    <div class="dlg-actions"><button type="button" class="btn" data-close>Abbrechen</button></div>
+  </dialog>
+
+  <!-- Feld ändern -->
+  <dialog id="dlg-feld" aria-labelledby="feld-name">
+    <form id="feld-form" method="dialog">
+      <h2 id="feld-name">Feld</h2>
+      <p>Automatisch berechnet: <b id="feld-auto"></b></p>
+      <p class="weg"><span class="weg-label">Rechenweg</span> <span id="feld-weg"></span></p>
+      <label class="f"><span>Eigener Wert (€)</span><input id="feld-wert" inputmode="decimal" autocomplete="off"></label>
+      <p id="feld-fehler" class="meldung meldung-fehler" role="alert" hidden>Bitte eine Zahl eingeben, z. B. 1.234,56</p>
+      <div class="dlg-actions">
+        <button type="button" class="btn" id="feld-zurueck">Wieder automatisch</button>
+        <button type="button" class="btn" data-close>Abbrechen</button>
+        <button type="submit" class="btn btn-primary">Übernehmen</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- PDF -->
+  <dialog id="dlg-pdf" aria-labelledby="pdf-titel">
+    <h2 id="pdf-titel">PDF erstellen</h2>
+    <fieldset class="optionen">
+      <legend>Was soll ins PDF?</legend>
+      <label><input type="radio" name="pdf-was" value="beide" checked> Arbeitsblatt und Lösungsblatt (eine Datei)</label>
+      <label><input type="radio" name="pdf-was" value="arbeit"> Nur Arbeitsblatt</label>
+      <label><input type="radio" name="pdf-was" value="loesung"> Nur Lösungsblatt</label>
+    </fieldset>
+    <p id="pdf-status" class="meldung" role="status" hidden></p>
+    <div class="dlg-actions">
+      <button type="button" class="btn btn-primary" id="pdf-go">PDF erstellen</button>
+      <button type="button" class="btn" id="pdf-share" hidden>Teilen …</button>
+      <button type="button" class="btn" id="pdf-download" hidden>Herunterladen</button>
+      <button type="button" class="btn" id="pdf-open" hidden>Öffnen</button>
+      <button type="button" class="btn" data-close>Schließen</button>
+    </div>
+  </dialog>
+
+  <!-- Sicherung -->
+  <dialog id="dlg-backup" aria-labelledby="backup-titel">
+    <h2 id="backup-titel">Sicherung</h2>
+    <p id="backup-info"></p>
+    <p class="muted">Die Zettel liegen nur in diesem Browser. Eine Sicherungsdatei lässt sich ablegen (z. B. OneDrive) und auf einem anderen Gerät einlesen.</p>
+    <div class="dlg-actions dlg-left">
+      <button type="button" class="btn btn-primary" id="backup-export">Sicherung erstellen</button>
+      <button type="button" class="btn" id="backup-share" hidden>Teilen …</button>
+      <label class="btn file-btn">Datei einlesen<input id="backup-import" type="file" accept="application/json,.json"></label>
+    </div>
+    <p id="backup-meldung" class="meldung" role="status" hidden></p>
+    <div class="dlg-actions"><button type="button" class="btn" data-close>Schließen</button></div>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" hidden>
+    <span id="toast-text"></span>
+    <button type="button" id="toast-action" class="btn btn-small" hidden></button>
+  </div>
+</body>
+</html>

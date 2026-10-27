@@ -1,0 +1,10 @@
+node_modules/
+test-results/
+playwright-report/
+*.log
+.DS_Store
+Thumbs.db
+# Echte Sicherungen und Schülerdaten gehören nie ins (öffentliche) Repo
+*Sicherung*.json
+privat/
+.claude/

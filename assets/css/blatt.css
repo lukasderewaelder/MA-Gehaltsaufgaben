@@ -1,0 +1,69 @@
+/* Arbeitsblatt und Lösungsblatt: A4-Seiten (794 × 1122 px bei 96 dpi), auch Grundlage für PDF und Druck. */
+#pages-host { width: 794px; margin: 0 auto; }
+
+.page {
+  position: relative;
+  width: 794px;
+  height: 1122px;
+  padding: 40px;
+  background: #fff;
+  color: #111827;
+  font: 14px/1.4 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: hidden;
+  margin: 0 auto 16px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+}
+.page.is-overflow { outline: 3px dashed #dc2626; outline-offset: -3px; }
+.page > * { flex: none; }
+
+.page-kopf { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; }
+.page-kopf h1 { display: inline; font-size: 22px; margin: 0; }
+.felder { display: flex; gap: 14px; }
+.felder span { display: inline-block; min-width: 110px; padding-top: 16px; border-bottom: 1px solid #111827; font-size: 11px; color: #6b7280; }
+.stempel {
+  display: inline-block; margin-left: 12px; padding: 1px 8px; border: 2px solid #15803d; border-radius: 6px;
+  color: #15803d; font-size: 12px; font-weight: 700; text-transform: uppercase; vertical-align: middle;
+}
+.page-zettel > .stempel { position: absolute; top: 14px; right: 24px; margin: 0; }
+.sachtext { margin: 0; }
+
+.teile { display: grid; gap: 8px 24px; }
+.teile.zwei { grid-template-columns: 1fr 1fr; }
+.teil { display: flex; gap: 8px; }
+.tl { font-weight: 700; min-width: 18px; }
+.tb { flex: 1; min-width: 0; }
+.tt { font-size: 13px; }
+.rz { height: 22px; border-bottom: 1px solid #cbd5e1; }
+.tloesung { background: #f0fdf4; border-left: 3px solid #16a34a; padding: 2px 8px; margin-top: 3px; font-size: 12px; }
+.tloesung span { color: #4b5563; }
+
+.slip-fit { display: flex; justify-content: center; width: 100%; }
+.slip.slip-compact { width: 100%; min-height: 0; padding: 0; border: 0; box-shadow: none; gap: 10px; }
+.slip-compact .slip-fuss { margin-top: 4px; }
+
+.val.luecke { display: inline-block; min-width: 76px; height: 1.25em; border-bottom: 1.5px solid #111827; vertical-align: bottom; }
+.val.luecke.gross { min-width: 130px; height: 1.3em; }
+.val.loesung { background: #dcfce7; box-shadow: inset 0 -2px 0 #16a34a; font-weight: 700; padding: 0 3px; }
+
+/* Beiblatt */
+.page h3 { margin: 6px 0 0; font-size: 15px; }
+.page p { margin: 0; }
+.mz { width: 100%; border-collapse: collapse; font-size: 13px; }
+.mz th, .mz td { border: 1px solid #9ca3af; padding: 3px 8px; }
+.mz th { background: #eef2ff; text-align: left; }
+.mz .r { text-align: right; font-variant-numeric: tabular-nums; }
+.mz.lst td, .mz.lst th { font-size: 12px; padding: 2px 8px; }
+.mz .spalte { background: #f0fdf4; }
+.mz .treffer { background: #dcfce7; font-weight: 700; }
+.klein { font-size: 11px; color: #6b7280; }
+
+/* Ansicht im Editor */
+.pane-bar { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+.pane-bar [role='tab'] { font: inherit; min-height: 40px; padding: 0 14px; border: 1px solid var(--line); border-radius: 10px; background: #fff; cursor: pointer; }
+.pane-bar [role='tab'][aria-selected='true'] { background: var(--blue); border-color: var(--blue); color: #fff; }
+#view-editor[data-pane='zettel'] #pages-host,
+#view-editor:not([data-pane='zettel']) #slip-host { display: none; }
+#pages-host .val[role='button'] { cursor: pointer; }

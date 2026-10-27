@@ -1,0 +1,19 @@
+/* Drucken: nur die gerade gezeigte Ansicht (Zettel oder Seiten des Arbeits-/Lösungsblatts), A4 hoch. */
+@page { size: A4 portrait; margin: 0; }
+body { background: #fff; padding: 0; }
+.banner, .toast, #view-library, dialog, .edbar, .ed-form, .hint, .pane-bar { display: none !important; }
+body[data-view='editor'] #view-editor { display: block !important; }
+.ed-body { display: block; }
+.ed-preview { padding: 0; overflow: visible; }
+.val.is-override { background: none !important; box-shadow: none !important; }
+
+/* Zettel allein */
+#slip-host { zoom: 1 !important; width: 100%; padding: 8mm; }
+.slip { box-shadow: none; border: 0; width: 100%; min-height: 0; padding: 0; }
+
+/* Seiten */
+#pages-host { zoom: 1 !important; width: 794px; margin: 0; }
+.page { margin: 0 !important; box-shadow: none; break-after: page; page-break-after: always; }
+.page:last-child { break-after: auto; page-break-after: auto; }
+.page.is-overflow { outline: none; }
+.val.luecke { border-bottom-color: #111827; }
