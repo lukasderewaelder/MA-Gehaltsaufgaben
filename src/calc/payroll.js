@@ -41,6 +41,19 @@ export function berechne(fall) {
     const betrag = feld(`p:${p.id}`, rechnung.betrag, rechnung.text);
     return { ...p, betrag };
   });
+  // Menge, Faktor und Prozentsatz stehen auf dem Zettel; sie lassen sich als Lücke wählen (Rückwärtsaufgaben), aber nicht überschreiben
+  for (const p of posten) {
+    const art = POSTEN_TYPEN[p.typ]?.art;
+    if (art !== 'menge' && art !== 'zuschlag') continue;
+    const zeig = (id, wert, text) => {
+      weg[id] = { text, berechnet: wert, ueberschrieben: false, nurAnzeige: true };
+      werte[id] = wert;
+    };
+    const prozentTeil = art === 'zuschlag' ? ` : ${fmtBp(p.prozent ?? 0)} %` : '';
+    zeig(`m:${p.id}`, p.menge, `${eur(p.betrag)} : ${eur(p.faktor)}${prozentTeil} = ${menge(p.menge)} ${p.einheit}`);
+    zeig(`f:${p.id}`, p.faktor, `${eur(p.betrag)} : ${menge(p.menge)} ${p.einheit}${prozentTeil} = ${eur(p.faktor)}`);
+    if (art === 'zuschlag') zeig(`z:${p.id}`, p.prozent ?? 0, `${eur(p.betrag)} : (${menge(p.menge)} ${p.einheit} · ${eur(p.faktor)}) = ${fmtBp(p.prozent ?? 0)} %`);
+  }
   const brutto = posten.filter((p) => p.bereich === 'brutto');
   const nettoPosten = posten.filter((p) => p.bereich === 'netto');
   const summe = (list, pred) => list.filter(pred).reduce((s, p) => s + p.betrag, 0);
@@ -126,6 +139,46 @@ export function berechne(fall) {
     av: kum('kumAv', av, 0, `${m} Monate`),
     pv: kum('kumPv', pv, 0, `${m} Monate`),
   };
+
+  // Woraus sich ein Feld ergibt (für den Vorführmodus: „das brauchst du“)
+  const pid = (list) => list.map((p) => `p:${p.id}`);
+  const aus = {
+    gesamtBrutto: pid(brutto),
+    stBrutto: pid(brutto.filter((p) => p.st !== 'F')),
+    kvBrutto: pid(brutto.filter((p) => p.sv !== 'F')),
+    rvBrutto: pid(brutto.filter((p) => p.sv !== 'F')),
+    avBrutto: pid(brutto.filter((p) => p.sv !== 'F')),
+    pvBrutto: pid(brutto.filter((p) => p.sv !== 'F')),
+    lst: ['stBrutto'],
+    soli: ['lst'],
+    kist: ['lst'],
+    kv: ['kvBrutto'],
+    rv: ['rvBrutto'],
+    av: ['avBrutto'],
+    pv: ['pvBrutto'],
+    steuerAbzuege: ['lst', 'soli', 'kist'],
+    svAbzuege: ['kv', 'rv', 'av', 'pv'],
+    netto: ['gesamtBrutto', 'steuerAbzuege', 'svAbzuege'],
+    nettoAbzuege: pid(nettoPosten),
+    auszahlung: ['netto', 'nettoAbzuege'],
+    agAnteil: ['kvBrutto', 'rvBrutto', 'avBrutto', 'pvBrutto'],
+    gesamtKosten: ['gesamtBrutto', 'agAnteil'],
+  };
+  for (const p of posten) {
+    const art = POSTEN_TYPEN[p.typ]?.art;
+    if (art === 'menge') aus[`p:${p.id}`] = [`m:${p.id}`, `f:${p.id}`];
+    if (art === 'zuschlag') aus[`p:${p.id}`] = [`m:${p.id}`, `f:${p.id}`, `z:${p.id}`];
+    if (art === 'menge' || art === 'zuschlag') {
+      aus[`f:${p.id}`] = [`p:${p.id}`, `m:${p.id}`];
+      aus[`m:${p.id}`] = [`p:${p.id}`, `f:${p.id}`];
+      if (art === 'zuschlag') {
+        aus[`z:${p.id}`] = [`p:${p.id}`, `m:${p.id}`, `f:${p.id}`];
+        aus[`f:${p.id}`].push(`z:${p.id}`);
+        aus[`m:${p.id}`].push(`z:${p.id}`);
+      }
+    }
+  }
+  for (const [id, quellen] of Object.entries(aus)) if (weg[id]) weg[id].aus = quellen.filter((q) => weg[q]);
 
   return {
     rates,

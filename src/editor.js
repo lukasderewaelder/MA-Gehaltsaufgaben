@@ -4,6 +4,8 @@ import { fmtBp, fmtCents, parseScaled } from './calc/money.js';
 import { YEARS } from './calc/rates.js';
 import { BLOECKE, KONFESSIONEN, MONATE, POSTEN_TYPEN, STEUERMODI, newPosten, normalizeFall, pruneOverrides } from './model.js';
 import { canSharePdf, createPdf, downloadPdf, openPdf, pdfFile, safeFilename, sharePdf } from './export-pdf.js';
+import { erzeugeFall, randomSeed } from './generators/faelle.js';
+import { BEITRAEGE, RUECK_TYPEN, STUNDEN_ARTEN, rueckPlan } from './rueck.js';
 import { esc, feldName, renderSlip } from './slip.js';
 import { $, toast } from './ui.js';
 import { PAGE_W, fitPages, gesuchteFelder, renderBlatt, sachtextAuto, teilText, teilaufgaben, verfuegbareFelder } from './worksheet.js';
@@ -65,10 +67,29 @@ function postenForm(fall, p, i) {
   </fieldset>`;
 }
 
+function rueckForm(fall, plan) {
+  const rueck = fall.aufgabe.rueck;
+  const optionen = (liste, wert) => Object.entries(liste).map(([k, t]) => `<option value="${k}"${k === wert ? ' selected' : ''}>${esc(t)}</option>`).join('');
+  const param =
+    rueck?.typ === 'beitrag'
+      ? `<label class="f"><span>Welcher Beitrag ist gegeben?</span><select data-action="rueck-param">${optionen(BEITRAEGE, rueck.param)}</select></label>`
+      : rueck?.typ === 'stundenlohn'
+        ? `<label class="f"><span>Was ist gesucht?</span><select data-action="rueck-param">${optionen(STUNDEN_ARTEN, rueck.param)}</select></label>`
+        : '';
+  return `<label class="f"><span>Aufgabenrichtung</span><select data-action="rueck-typ">
+      <option value="">Vorwärts: Brutto → Netto</option>
+      ${Object.entries(RUECK_TYPEN).map(([k, t]) => `<option value="${k}"${rueck?.typ === k ? ' selected' : ''}>Rückwärts: ${esc(t.label)}</option>`).join('')}
+    </select></label>
+    ${rueck ? `<p class="muted">${esc(RUECK_TYPEN[rueck.typ].hilfe)}</p>` : ''}
+    ${param}
+    ${plan?.fehler ? `<p class="meldung meldung-fehler">${esc(plan.fehler)}</p>` : ''}`;
+}
+
 function aufgabeForm(fall, r) {
   const a = fall.aufgabe;
-  const gesucht = new Set(gesuchteFelder(fall, r));
-  const sach = a.sachtext ?? sachtextAuto(fall, gesucht.size > 0);
+  const plan = rueckPlan(fall, r);
+  const gesucht = new Set(gesuchteFelder(fall, r, plan));
+  const sach = a.sachtext ?? sachtextAuto(fall, gesucht.size > 0, plan);
   const gruppen = verfuegbareFelder(fall, r)
     .map(
       (g) => `<div class="gruppe"><h4>${esc(g.gruppe)}</h4>${g.felder
@@ -76,20 +97,21 @@ function aufgabeForm(fall, r) {
         .join('')}</div>`,
     )
     .join('');
-  const teile = teilaufgaben(fall, r)
+  const teile = (plan ? [] : teilaufgaben(fall, r))
     .map(
       (t) => `<label class="f"><span>${esc(t.nr)} ${esc(feldName(t.id, fall))}</span><input data-action="teiltext" data-id="${esc(t.id)}" value="${esc(a.texte[t.id] ?? '')}" placeholder="${esc(teilText(fall, r, t.id))}"></label>`,
     )
     .join('');
   return `<details><summary>Arbeitsblatt</summary>
+    ${rueckForm(fall, plan)}
     ${select('Blattart', 'aufgabe.blatt', [['aufgabe', 'Aufgabenblatt mit Zettel'], ['zettel', 'Nur der Zettel']], fall)}
     <div class="row">${input('Überschrift', 'aufgabe.titel', 'text', fall, `placeholder="${esc(fall.titel)}"`)}${select('Rechenzeilen', 'aufgabe.zeilen', [0, 1, 2, 3, 4, 5].map((n) => [n, n]), fall, 'int')}</div>
     ${check('Beiblatt „Abzüge im Überblick“ mitliefern', 'aufgabe.beiblatt', fall)}
     <label class="f"><span>Einleitender Text</span><textarea id="sachtext" data-action="sachtext" rows="4">${esc(sach)}</textarea></label>
     <button type="button" class="btn btn-small" data-action="sach-auto">Text automatisch erzeugen</button>
     <h3 class="zw">Gesuchte Werte</h3>
-    <p class="muted">Diese Werte bleiben auf dem Arbeitsblatt leer. Man kann sie auch direkt im Arbeits- oder Lösungsblatt antippen.</p>
-    ${gruppen}
+    <p class="muted">${plan ? 'Bei Rückwärtsaufgaben sind die Lücken fest vorgegeben.' : 'Diese Werte bleiben auf dem Arbeitsblatt leer. Man kann sie auch direkt im Arbeits- oder Lösungsblatt antippen.'}</p>
+    ${plan ? '' : gruppen}
     ${teile ? `<h3 class="zw">Texte der Teilaufgaben</h3><p class="muted">Leer lassen für den automatischen Text.</p>${teile}` : ''}
   </details>`;
 }
@@ -245,8 +267,18 @@ export function createEditor(app) {
   });
 
   formHost.addEventListener('change', (e) => {
-    const el = e.target.closest('[data-bind],[data-action="typ"],[data-action="gesucht"]');
+    const el = e.target.closest('[data-bind],[data-action="typ"],[data-action="gesucht"],[data-action="rueck-typ"],[data-action="rueck-param"]');
     if (!el) return;
+    if (el.dataset.action === 'rueck-typ') {
+      fall.aufgabe.rueck = el.value ? { typ: el.value, param: { beitrag: 'rv', stundenlohn: 'stundenlohn' }[el.value] ?? '' } : null;
+      changed({ form: true });
+      return;
+    }
+    if (el.dataset.action === 'rueck-param') {
+      fall.aufgabe.rueck.param = el.value;
+      changed({ form: true });
+      return;
+    }
     if (el.dataset.action === 'gesucht') {
       toggleGesucht(el.dataset.id, el.checked);
       return;
@@ -274,6 +306,7 @@ export function createEditor(app) {
 
   /** Feld als gesucht (leer auf dem Arbeitsblatt) markieren oder wieder angeben; `an` = true/false, sonst umschalten. */
   function toggleGesucht(id, an) {
+    if (fall.aufgabe.rueck) return toast('Bei Rückwärtsaufgaben sind die Lücken fest vorgegeben.');
     const liste = fall.aufgabe.gesucht;
     const drin = liste.includes(id);
     const soll = an ?? !drin;
@@ -316,7 +349,7 @@ export function createEditor(app) {
   function openFeld(id) {
     const r = result();
     const w = r.weg[id];
-    if (!w) return;
+    if (!w || w.nurAnzeige) return;
     feldId = id;
     $('#feld-name').textContent = feldName(id, fall);
     $('#feld-auto').textContent = `${fmtCents(w.berechnet)} €`;
@@ -433,6 +466,28 @@ export function createEditor(app) {
     fall.titel = e.target.value;
     scheduleSave();
   });
+  function ersetzen(neu) {
+    for (const key of Object.keys(fall)) delete fall[key];
+    Object.assign(fall, neu);
+    $('#ed-titel').value = fall.titel;
+    $('#ed-wuerfeln').hidden = !fall.zufall;
+    changed({ form: true });
+  }
+  $('#ed-wuerfeln').addEventListener('click', () => {
+    if (!fall?.zufall) return;
+    const alt = structuredClone(fall);
+    const neu = erzeugeFall({ ...fall.zufall, seed: randomSeed(), strukturSeed: null, gruppe: 0 });
+    ersetzen(
+      normalizeFall({
+        ...neu,
+        id: alt.id,
+        createdAt: alt.createdAt,
+        anzeige: alt.anzeige,
+        aufgabe: { ...neu.aufgabe, blatt: alt.aufgabe.blatt, beiblatt: alt.aufgabe.beiblatt, zeilen: alt.aufgabe.zeilen, rueck: alt.aufgabe.rueck },
+      }),
+    );
+    toast('Neuer Zufallsfall mit den gleichen Einstellungen.', { action: 'Rückgängig', onAction: () => ersetzen(alt) });
+  });
   $('#ed-reset').addEventListener('click', () => {
     if (!Object.keys(fall.ueberschreibungen).length) return toast('Es sind keine Felder von Hand geändert.');
     const alt = fall.ueberschreibungen;
@@ -456,6 +511,7 @@ export function createEditor(app) {
       fall = loaded;
       document.body.dataset.view = 'editor';
       $('#ed-titel').value = fall.titel;
+      $('#ed-wuerfeln').hidden = !fall.zufall;
       renderForm();
       setPane('zettel');
       return true;

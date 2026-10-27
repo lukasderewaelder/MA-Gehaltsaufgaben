@@ -34,6 +34,7 @@
       <h1 class="brand">Lohnzettel-Werkstatt</h1>
       <span class="spacer"></span>
       <button type="button" id="lib-backup" class="btn">Sicherung</button>
+      <button type="button" id="lib-zufall" class="btn">Zufallsfall</button>
       <button type="button" id="lib-neu" class="btn btn-primary">Neuer Zettel</button>
     </header>
     <div id="backup-reminder" class="banner banner-info" hidden>
@@ -52,6 +53,7 @@
       <button type="button" id="ed-back" class="btn">← Übersicht</button>
       <input id="ed-titel" class="ed-titel" type="text" aria-label="Titel des Zettels" autocomplete="off">
       <span class="spacer"></span>
+      <button type="button" id="ed-wuerfeln" class="btn" title="Gleiche Einstellungen, neuer Zufall" hidden>Neu würfeln</button>
       <button type="button" id="ed-reset" class="btn" title="Alle von Hand geänderten Felder wieder automatisch rechnen">Felder zurücksetzen</button>
       <button type="button" id="ed-dup" class="btn">Duplizieren</button>
       <button type="button" id="ed-print" class="btn btn-primary">Drucken</button>
@@ -80,6 +82,19 @@
     <h3>Oder mit einem Szenario beginnen</h3>
     <ul id="neu-liste" class="szenarien"></ul>
     <div class="dlg-actions"><button type="button" class="btn" data-close>Abbrechen</button></div>
+  </dialog>
+
+  <!-- Zufallsfall -->
+  <dialog id="dlg-zufall" aria-labelledby="zufall-titel">
+    <form id="zufall-form" method="dialog">
+      <h2 id="zufall-titel">Zufallsfall erzeugen</h2>
+      <div id="zufall-felder"></div>
+      <p id="zufall-vorschau" class="weg" aria-live="polite"></p>
+      <div class="dlg-actions">
+        <button type="button" class="btn" data-close>Abbrechen</button>
+        <button type="submit" class="btn btn-primary" id="zufall-ok">Erzeugen</button>
+      </div>
+    </form>
   </dialog>
 
   <!-- Feld ändern -->

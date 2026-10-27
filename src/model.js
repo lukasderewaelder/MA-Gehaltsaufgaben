@@ -114,6 +114,40 @@ function normalizeAufgabe(raw) {
     gesucht: [...new Set((Array.isArray(a.gesucht) ? a.gesucht : []).filter((id) => typeof id === 'string'))],
     texte: Object.fromEntries(Object.entries(a.texte ?? {}).filter(([, v]) => typeof v === 'string' && v.trim())),
     zeilen: num(a.zeilen, 2, 0, 5),
+    rueck: normalizeRueck(a.rueck),
+  };
+}
+
+/** Rückwärtsaufgabe: null (vorwärts) oder { typ, param }. */
+function normalizeRueck(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const typ = oneOf(raw.typ, ['beitrag', 'stundenlohn', 'quote', 'probieren'], null);
+  if (!typ) return null;
+  const params = { beitrag: ['rv', 'kv', 'av', 'pv'], stundenlohn: ['stundenlohn', 'stunden', 'zuschlag'] };
+  return { typ, param: params[typ] ? oneOf(raw.param, params[typ], params[typ][0]) : '' };
+}
+
+/** Zufallsfall-Einstellungen (nur wenn der Fall erzeugt wurde, damit „Neu würfeln“ möglich ist); null sonst. */
+function normalizeZufall(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const b = (v, d) => (typeof v === 'boolean' ? v : d);
+  return {
+    stufe: oneOf(raw.stufe, ['leicht', 'mittel', 'schwer'], 'mittel'),
+    seed: num(raw.seed, 1, 0, 4294967295),
+    strukturSeed: Number.isFinite(raw.strukturSeed) ? num(raw.strukturSeed, 1, 0, 4294967295) : null,
+    art: oneOf(raw.art, ['gehalt', 'lohn', 'gemischt'], 'gemischt'),
+    aufgabe: oneOf(raw.aufgabe, ['komplett', 'netto', 'sv', 'steuer', 'brutto'], 'komplett'),
+    steuer: oneOf(raw.steuer, ['prozent', 'tabelle', 'formel'], 'tabelle'),
+    glatt: b(raw.glatt, false),
+    zuschlaege: b(raw.zuschlaege, false),
+    sonderzahlung: b(raw.sonderzahlung, false),
+    kirche: b(raw.kirche, false),
+    kinder: b(raw.kinder, false),
+    klassen: oneOf(raw.klassen, ['I', 'alle'], 'I'),
+    ueberBbg: b(raw.ueberBbg, false),
+    minijob: b(raw.minijob, false),
+    gruppe: num(raw.gruppe, 0, 0, 25),
+    rueck: oneOf(raw.rueck, ['beitrag', 'stundenlohn', 'quote', 'probieren'], ''),
   };
 }
 
@@ -179,6 +213,7 @@ export function normalizeFall(raw) {
       erklaermodus: Boolean(raw.anzeige?.erklaermodus),
     },
     aufgabe: normalizeAufgabe(raw.aufgabe),
+    zufall: normalizeZufall(raw.zufall),
     hinweis: str(raw.hinweis),
     fehltage: { urlaub: num(raw.fehltage?.urlaub, 0, 0, 366), krank: num(raw.fehltage?.krank, 0, 0, 366) },
     bank: { name: str(raw.bank?.name), iban: str(raw.bank?.iban) },

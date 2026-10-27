@@ -2,14 +2,15 @@
 import { fmtBp, fmtCents } from './calc/money.js';
 import { tabellenLohnsteuer, tabellenStufe } from './calc/tax.js';
 import { MONATE, POSTEN_TYPEN } from './model.js';
-import { esc, feldName, renderSlip } from './slip.js';
+import { rueckPlan } from './rueck.js';
+import { esc, feldName, fmtWert, renderSlip } from './slip.js';
 
 export const PAGE_W = 794; // A4 bei 96 dpi
 export const PAGE_H = 1122;
 const PAGE_PAD = 40;
 
 const GRUPPEN = [
-  ['Bezüge', (id) => id.startsWith('p:') || id === 'gesamtBrutto'],
+  ['Bezüge', (id) => /^[pmfz]:/.test(id) || id === 'gesamtBrutto'],
   ['Steuer', (id) => ['stBrutto', 'lst', 'soli', 'kist'].includes(id)],
   ['Sozialversicherung', (id) => ['kvBrutto', 'rvBrutto', 'avBrutto', 'pvBrutto', 'kv', 'rv', 'av', 'pv'].includes(id)],
   ['Ergebnis', (id) => ['steuerAbzuege', 'svAbzuege', 'netto', 'nettoAbzuege', 'auszahlung'].includes(id)],
@@ -32,7 +33,9 @@ export function verfuegbareFelder(fall, r) {
     if (id.startsWith('kum')) return b.verdienst;
     return true;
   };
-  const postenIds = r.posten.filter((p) => p.bereich === 'brutto' || b.netto).map((p) => `p:${p.id}`);
+  const postenIds = r.posten
+    .filter((p) => p.bereich === 'brutto' || b.netto)
+    .flatMap((p) => [`p:${p.id}`, `m:${p.id}`, `f:${p.id}`, `z:${p.id}`].filter((id) => r.weg[id]));
   const ids = [...postenIds, ...REIHENFOLGE.filter(sichtbar)];
   // Bezüge zuerst (Posten, dann Gesamt-Brutto), danach nach fester Reihenfolge
   const ordnung = new Map(ids.map((id, i) => [id, i]));
@@ -48,6 +51,13 @@ const eur = (c) => `${fmtCents(c)} €`;
 export function teilText(fall, r, id) {
   const k = fall.person.steuerklasse;
   const s = r.saetze;
+  if (/^[mfz]:/.test(id)) {
+    const p = r.posten.find((x) => x.id === id.slice(2));
+    const n = p?.bezeichnung ?? 'Posten';
+    if (id[0] === 'f') return `Berechne den ${p && POSTEN_TYPEN[p.typ].art === 'zuschlag' ? 'Stundenlohn' : 'Faktor (z. B. Stundenlohn)'} in der Zeile „${n}“ (Betrag : Menge${p && POSTEN_TYPEN[p.typ].art === 'zuschlag' ? ' : Prozentsatz' : ''}).`;
+    if (id[0] === 'm') return `Wie viele ${p?.einheit === 'Std' ? 'Stunden' : 'Einheiten'} gehören zu „${n}“? (Betrag : Faktor)`;
+    return `Wie hoch ist der Zuschlagssatz bei „${n}“ in Prozent? (Betrag : (Menge · Stundenlohn))`;
+  }
   if (id.startsWith('p:')) {
     const p = r.posten.find((x) => `p:${x.id}` === id);
     const art = POSTEN_TYPEN[p?.typ]?.art ?? 'pauschal';
@@ -90,25 +100,30 @@ export function teilText(fall, r, id) {
   return texte[id] ?? `Bestimme: ${feldName(id, fall)}.`;
 }
 
-export function sachtextAuto(fall, hatGesucht) {
+export function sachtextAuto(fall, hatGesucht, plan = null) {
+  if (plan?.sachtext) return plan.sachtext;
   const p = fall.person;
   const kinder = p.kinder > 0 ? `${p.kinder} ${p.kinder === 1 ? 'Kind' : 'Kinder'}` : 'keine Kinder';
   return `${p.name} arbeitet bei ${fall.firma.name}. Hier ist die Abrechnung für ${MONATE[fall.monat - 1]} ${fall.jahr} (Steuerklasse ${p.steuerklasse}, ${kinder}). ${hatGesucht ? 'Einige Werte fehlen. Ergänze sie.' : 'Lies die Abrechnung genau.'}`;
 }
 
 /** Gesuchte Felder (nur die, die es auf dem Zettel gibt) in Lese-Reihenfolge. */
-export function gesuchteFelder(fall, r) {
-  const da = new Set(verfuegbareFelder(fall, r).flatMap((g) => g.felder.map((f) => f.id)));
-  const wahl = new Set(fall.aufgabe.gesucht.filter((id) => da.has(id)));
-  return verfuegbareFelder(fall, r).flatMap((g) => g.felder.map((f) => f.id)).filter((id) => wahl.has(id));
+export function gesuchteFelder(fall, r, plan = rueckPlan(fall, r)) {
+  const alle = verfuegbareFelder(fall, r).flatMap((g) => g.felder.map((f) => f.id));
+  const wahl = new Set(plan ? plan.gesucht : fall.aufgabe.gesucht);
+  return alle.filter((id) => wahl.has(id));
 }
 
-export function teilaufgaben(fall, r) {
-  return gesuchteFelder(fall, r).map((id, i) => ({
+const buchstabe = (i) => `${String.fromCharCode(97 + (i % 26))})`;
+
+export function teilaufgaben(fall, r, plan = rueckPlan(fall, r)) {
+  if (plan?.teile) return plan.teile.map((t, i) => ({ ...t, nr: buchstabe(i), wert: null }));
+  return gesuchteFelder(fall, r, plan).map((id, i) => ({
     id,
-    nr: `${String.fromCharCode(97 + (i % 26))})`,
-    text: fall.aufgabe.texte[id] ?? teilText(fall, r, id),
+    nr: buchstabe(i),
+    text: plan ? teilText(fall, r, id) : fall.aufgabe.texte[id] ?? teilText(fall, r, id),
     wert: r.werte[id],
+    anzeige: fmtWert(id, r.werte[id], fall),
     weg: r.weg[id]?.text ?? '',
   }));
 }
@@ -175,34 +190,52 @@ const linien = (n) => Array.from({ length: n }, () => '<div class="rz"></div>').
 
 /** Seiten als HTML: Aufgabenblatt (oder nur Zettel) und, wenn gewählt, das Beiblatt. */
 export function renderBlatt(fall, r, { modus = 'arbeit', interactive = false } = {}) {
-  const gesucht = new Set(gesuchteFelder(fall, r));
-  const slip = renderSlip(fall, r, { interactive, compact: true, modus, gesucht, hinweis: 'anklicken: gesucht oder angegeben' });
+  const plan = rueckPlan(fall, r);
+  const gesucht = new Set(gesuchteFelder(fall, r, plan));
   const stempel = modus === 'loesung' ? '<span class="stempel">Lösung</span>' : '';
-  const teile = teilaufgaben(fall, r);
+  const teile = teilaufgaben(fall, r, plan);
   const a = fall.aufgabe;
+  const ohneZettel = Boolean(plan?.ohneZettel);
+  const slip = ohneZettel
+    ? ''
+    : renderSlip(fall, r, { interactive: interactive && !plan, compact: true, modus, gesucht, hinweis: 'anklicken: gesucht oder angegeben' });
   let seite;
-  if (a.blatt === 'zettel') {
+  if (a.blatt === 'zettel' && !plan) {
     seite = `<section class="page page-zettel" data-seite="blatt">${stempel}<div class="slip-fit">${slip}</div></section>`;
   } else {
-    const sach = a.sachtext ?? sachtextAuto(fall, teile.length > 0);
+    const sach = a.sachtext ?? sachtextAuto(fall, teile.length > 0, plan);
     const eintraege = teile
-      .map(
-        (t) => `<div class="teil"><span class="tl">${t.nr}</span><div class="tb"><div class="tt">${esc(t.text)}</div>${
+      .map((t) => {
+        const anzeige = t.anzeige ?? eur(t.wert);
+        const unten =
           modus === 'loesung'
-            ? `<div class="tloesung"><b>${eur(t.wert)}</b> <span>${esc(t.weg)}</span></div>`
-            : linien(a.zeilen)
-        }</div></div>`,
-      )
+            ? anzeige || t.weg
+              ? `<div class="tloesung"><b>${esc(anzeige)}</b> <span>${esc(t.weg)}</span></div>`
+              : ''
+            : plan?.versuchstabelle && t.id === 'rueck'
+              ? versuche(modus, plan)
+              : linien(a.zeilen);
+        return `<div class="teil"><span class="tl">${t.nr}</span><div class="tb"><div class="tt">${esc(t.text)}</div>${unten}</div></div>`;
+      })
       .join('');
     seite = `<section class="page page-blatt" data-seite="blatt">
       <header class="page-kopf"><div><h1>${esc(a.titel || fall.titel)}</h1>${stempel}</div>
         <div class="felder"><span>Name</span><span>Klasse</span><span>Datum</span></div></header>
-      <p class="sachtext">${esc(sach)}</p>
-      ${teile.length ? `<div class="teile${teile.length > 4 ? ' zwei' : ''}">${eintraege}</div>` : ''}
-      <div class="slip-fit">${slip}</div>
+      ${plan?.fehler ? `<p class="fehler">${esc(plan.fehler)}</p>` : `<p class="sachtext">${esc(sach)}</p>`}
+      ${teile.length ? `<div class="teile${teile.length > 4 && !ohneZettel ? ' zwei' : ''}">${eintraege}</div>` : ''}
+      ${modus === 'loesung' && plan?.versuche ? versuche(modus, plan) : ''}
+      ${slip ? `<div class="slip-fit">${slip}</div>` : ''}
     </section>`;
   }
   return seite + (a.beiblatt ? merkzettel(fall, r, { modus }) : '');
+}
+
+/** Tabelle zum Ausprobieren: leer im Arbeitsblatt, mit den Versuchen der Lösung im Lösungsblatt. */
+function versuche(modus, plan) {
+  const zeilen = modus === 'loesung'
+    ? plan.versuche.map((v) => `<tr><td class="r">${fmtCents(v.brutto)}</td><td class="r">${fmtCents(v.netto)}</td><td class="r">${v.netto >= plan.ziel ? 'reicht' : 'zu wenig'}</td></tr>`).join('')
+    : Array.from({ length: 6 }, () => '<tr><td>&nbsp;</td><td></td><td></td></tr>').join('');
+  return `<table class="mz versuche"><thead><tr><th class="r">Brutto (€)</th><th class="r">Netto (€)</th><th class="r">Ziel ${fmtCents(plan.ziel)} € erreicht?</th></tr></thead><tbody>${zeilen}</tbody></table>`;
 }
 
 /** Passt den Zettel auf jeder Seite in den freien Platz (verkleinert bis 55 %); markiert Seiten, auf denen es nicht reicht. */

@@ -59,6 +59,9 @@
 .mz .spalte { background: #f0fdf4; }
 .mz .treffer { background: #dcfce7; font-weight: 700; }
 .klein { font-size: 11px; color: #6b7280; }
+.fehler { color: #b91c1c; margin: 0; }
+.versuche td { height: 26px; }
+.versuche { margin-top: 6px; }
 
 /* Ansicht im Editor */
 .pane-bar { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }

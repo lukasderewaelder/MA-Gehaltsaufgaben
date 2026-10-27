@@ -37,12 +37,26 @@ export const FELD_NAMEN = {
   kumPv: 'PV-Beitrag (seit Januar)',
 };
 
+const POSTEN_FELD = { p: 'Betrag', m: 'Menge', f: 'Faktor', z: 'Prozentsatz' };
+
 export function feldName(id, fall) {
-  if (id.startsWith('p:')) {
-    const p = fall.posten.find((x) => `p:${x.id}` === id);
-    return p ? `Betrag: ${p.bezeichnung}` : 'Betrag';
+  const art = id.slice(0, 2);
+  if (['p:', 'm:', 'f:', 'z:'].includes(art)) {
+    const p = fall.posten.find((x) => x.id === id.slice(2));
+    const was = POSTEN_FELD[art[0]];
+    return p ? `${was}: ${p.bezeichnung}` : was;
   }
   return FELD_NAMEN[id] ?? id;
+}
+
+/** Wert eines Feldes als Text (Betrag in €, Menge mit Einheit, Prozentsatz). */
+export function fmtWert(id, wert, fall) {
+  if (id.startsWith('z:')) return `${fmtBp(wert)} %`;
+  if (id.startsWith('m:')) {
+    const p = fall.posten.find((x) => x.id === id.slice(2));
+    return `${fmtCents(wert)}${p ? ` ${p.einheit}` : ''}`;
+  }
+  return `${fmtCents(wert)} €`;
 }
 
 const eur = fmtCents;
@@ -55,13 +69,13 @@ const eur = fmtCents;
 export function renderSlip(fall, r, { interactive = false, compact = false, modus = 'zettel', gesucht = new Set(), hinweis = 'anklicken zum Ändern' } = {}) {
   const optik = fall.anzeige.optik;
   const bloecke = fall.anzeige.bloecke;
-  const val = (id, cents, cls = '') => {
+  const val = (id, cents, cls = '', text = null) => {
     const w = r.weg[id];
     const gefragt = modus !== 'zettel' && gesucht.has(id);
-    const attrs = interactive ? ` tabindex="0" role="button" title="${esc(`${gefragt && modus === 'arbeit' ? '' : `${w?.text ?? ''} – `}${hinweis}`)}"` : '';
+    const attrs = interactive && !(modus === 'zettel' && w?.nurAnzeige) ? ` tabindex="0" role="button" title="${esc(`${gefragt && modus === 'arbeit' ? '' : `${w?.text ?? ''} – `}${hinweis}`)}"` : '';
     if (gefragt && modus === 'arbeit') return `<span class="val luecke ${cls}" data-feld="${esc(id)}"${attrs}>&nbsp;</span>`;
     const extra = `${w?.ueberschrieben ? ' is-override' : ''}${gefragt ? ' loesung' : ''}`;
-    return `<span class="val ${cls}${extra}" data-feld="${esc(id)}"${attrs}>${eur(cents)}</span>`;
+    return `<span class="val ${cls}${extra}" data-feld="${esc(id)}"${attrs}>${text ?? eur(cents)}</span>`;
   };
   const kopfZelle = (label, wert) => `<div class="kz"><span class="kl">${esc(label)}</span><span class="kw">${esc(wert)}</span></div>`;
   const p = fall.person;
@@ -71,9 +85,9 @@ export function renderSlip(fall, r, { interactive = false, compact = false, modu
   const zeilen = r.bruttoPosten
     .map((x) => {
       const art = POSTEN_TYPEN[x.typ]?.art ?? 'pauschal';
-      const menge = art === 'pauschal' ? '' : eur(x.menge);
-      const faktor = art === 'pauschal' ? '' : eur(x.faktor);
-      const prozent = art === 'zuschlag' ? fmtBp(x.prozent ?? 0) : '';
+      const menge = art === 'pauschal' ? '' : val(`m:${x.id}`, x.menge);
+      const faktor = art === 'pauschal' ? '' : val(`f:${x.id}`, x.faktor);
+      const prozent = art === 'zuschlag' ? val(`z:${x.id}`, x.prozent ?? 0, '', fmtBp(x.prozent ?? 0)) : '';
       return `<tr>
         <td class="c">${esc(x.lohnart)}</td><td>${esc(x.bezeichnung)}</td><td class="c">${art === 'pauschal' ? '' : esc(x.einheit)}</td>
         <td class="r">${menge}</td><td class="r">${faktor}</td><td class="r">${prozent}</td>

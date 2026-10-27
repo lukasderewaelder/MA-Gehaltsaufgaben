@@ -5,6 +5,7 @@ import { createLibrary } from './library.js';
 import { duplicateFall } from './model.js';
 import { openStore } from './store.js';
 import { $, fileDeliverable, toast, wireDialogs } from './ui.js';
+import { createZufallDialog } from './zufall-ui.js';
 
 const fallPath = (id) => `#/fall/${encodeURIComponent(id)}`;
 const currentFallId = () => {
@@ -65,6 +66,14 @@ export async function startApp() {
     await app.refreshFaelle();
     app.noteChange();
     await app.go(fallPath(fall.id));
+  };
+  /** Mehrere erzeugte Zettel (Gruppen A, B …) speichern und den ersten öffnen. */
+  app.createFaelle = async (faelle) => {
+    for (const f of faelle) await store.saveFall(f);
+    await app.refreshFaelle();
+    app.noteChange();
+    await app.go(fallPath(faelle[0].id));
+    if (faelle.length > 1) toast(`${faelle.length} Zettel angelegt (Gruppen A bis ${String.fromCharCode(64 + faelle.length)}). Du findest sie in der Übersicht.`);
   };
   app.duplicateFall = async (fall, { open = true } = {}) => {
     await editor.flush();
@@ -155,6 +164,8 @@ export async function startApp() {
   // --- Start ----------------------------------------------------------------------------------------
   editor = createEditor(app);
   library = createLibrary(app);
+  const zufall = createZufallDialog(app);
+  $('#lib-zufall').addEventListener('click', () => zufall.open());
   await app.refreshFaelle();
   await route();
   window.__lohnzettel = { app, getFall: () => editor.getFall(), flush: () => editor.flush() };
