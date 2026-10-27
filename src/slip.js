@@ -61,16 +61,63 @@ export function fmtWert(id, wert, fall) {
 
 const eur = fmtCents;
 
-/**
- * Optionen: interactive (Felder anklickbar), compact (ohne Mindesthöhe, für das Arbeitsblatt),
+/** Erklärmodus: Bereiche des Zettels mit Nummern und Text in Schülersprache (nur vorhandene Bereiche werden gezählt). */
+const ERKLAERUNGEN = [
+  { id: 'kopf', titel: 'Wer und wofür?', text: 'Firma, Name, Personalnummer, Steuerklasse, Kinder, Konfession und Krankenkasse. Diese Angaben bestimmen, wie viel abgezogen wird.' },
+  { id: 'bezuege', titel: 'Die Bezüge', text: 'Alles, was verdient wurde, mit Menge und Faktor (z. B. Stunden mal Stundenlohn). Ein Prozentsatz zeigt einen Zuschlag.' },
+  { id: 'stsv', titel: 'St und SV', text: 'L = laufender Bezug, S = Sonderzahlung, F = frei. Nur bei L und S werden Steuern (St) und Sozialversicherung (SV) fällig.' },
+  { id: 'brutto', titel: 'Gesamt-Brutto', text: 'Die Summe aller Bezüge – das Geld, bevor etwas abgezogen wird.' },
+  { id: 'steuer', titel: 'Steuern', text: 'Lohnsteuer, Kirchensteuer und Solidaritätszuschlag werden vom Steuer-Brutto berechnet.' },
+  { id: 'sozial', titel: 'Sozialversicherung', text: 'Kranken-, Renten-, Arbeitslosen- und Pflegeversicherung: jeweils ein Prozentsatz vom Brutto – höchstens bis zur Beitragsbemessungsgrenze.' },
+  { id: 'steuerabzug', titel: 'Steuerrechtliche Abzüge', text: 'Lohnsteuer + Kirchensteuer + Solidaritätszuschlag.' },
+  { id: 'svabzug', titel: 'SV-rechtliche Abzüge', text: 'Die vier Sozialversicherungsbeiträge zusammen.' },
+  { id: 'netto', titel: 'Netto-Verdienst', text: 'Brutto minus alle Abzüge.' },
+  { id: 'verdienst', titel: 'Jahressummen', text: 'Alle Werte seit Januar zusammengezählt, z. B. für die Steuererklärung.', block: 'verdienst' },
+  { id: 'nettoabzug', titel: 'Abzüge vom Netto', text: 'Z. B. vermögenswirksame Leistungen: Sie werden erst nach den Steuern abgezogen.', block: 'netto' },
+  { id: 'arbeitgeber', titel: 'Arbeitgeberseite', text: 'Der Arbeitgeber zahlt zusätzlich seinen Anteil zur Sozialversicherung. Brutto plus dieser Anteil sind die Gesamtkosten.', block: 'arbeitgeber' },
+  { id: 'fehltage', titel: 'Fehltage und Hinweise', text: 'Urlaubs- und Krankheitstage sowie Anmerkungen zur Abrechnung.', block: 'fehltage' },
+  { id: 'auszahlung', titel: 'Auszahlungsbetrag', text: 'Das Geld, das tatsächlich auf dem Konto ankommt.' },
+];
+
+/** Die Erklärungen mit fortlaufender Nummer (nur Bereiche, die der Zettel gerade zeigt). */
+export function erklaerungen(fall) {
+  return ERKLAERUNGEN.filter((e) => !e.block || fall.anzeige.bloecke[e.block]).map((e, i) => ({ ...e, nr: i + 1 }));
+}
+
+/** Optionen: interactive (Felder anklickbar), compact (ohne Mindesthöhe, für das Arbeitsblatt),
  * modus: 'zettel' (alles sichtbar), 'arbeit' (gesuchte Felder leer), 'loesung' (gesuchte Felder hervorgehoben),
- * gesucht: Menge der gesuchten Feld-Ids, hinweis: Text für die Anklick-Hilfe.
- */
-export function renderSlip(fall, r, { interactive = false, compact = false, modus = 'zettel', gesucht = new Set(), hinweis = 'anklicken zum Ändern' } = {}) {
+ *        'vorfuehren' (verdeckte Felder als „?“, Zutaten und gewähltes Feld markiert),
+ * gesucht: Menge der gesuchten Feld-Ids, hinweis: Text für die Anklick-Hilfe,
+ * erklaer: nummerierte Marken, legende: Legende unter dem Zettel (bei Erklärmodus),
+ * verdeckt, quellen, aktiv: nur für den Vorführmodus. */
+export function renderSlip(
+  fall,
+  r,
+  {
+    interactive = false,
+    compact = false,
+    modus = 'zettel',
+    gesucht = new Set(),
+    hinweis = 'anklicken zum Ändern',
+    erklaer = fall.anzeige.erklaermodus,
+    legende = true,
+    verdeckt = new Set(),
+    quellen = new Set(),
+    aktiv = null,
+  } = {},
+) {
   const optik = fall.anzeige.optik;
   const bloecke = fall.anzeige.bloecke;
+  const nummern = new Map(erklaerungen(fall).map((e) => [e.id, e.nr]));
+  const marke = (id) => (erklaer && nummern.has(id) ? `<span class="marke" aria-hidden="true">${nummern.get(id)}</span>` : '');
   const val = (id, cents, cls = '', text = null) => {
     const w = r.weg[id];
+    if (modus === 'vorfuehren') {
+      const klassen = `${cls}${quellen.has(id) ? ' quelle' : ''}${aktiv === id ? ' aktiv' : ''}`;
+      const knopf = ' tabindex="0" role="button"';
+      if (verdeckt.has(id)) return `<span class="val verdeckt ${klassen}" data-feld="${esc(id)}"${knopf} aria-label="Verdeckter Wert, antippen zum Aufdecken">&nbsp;</span>`;
+      return `<span class="val ${klassen}" data-feld="${esc(id)}"${knopf}>${text ?? eur(cents)}</span>`;
+    }
     const gefragt = modus !== 'zettel' && gesucht.has(id);
     const attrs = interactive && !(modus === 'zettel' && w?.nurAnzeige) ? ` tabindex="0" role="button" title="${esc(`${gefragt && modus === 'arbeit' ? '' : `${w?.text ?? ''} – `}${hinweis}`)}"` : '';
     if (gefragt && modus === 'arbeit') return `<span class="val luecke ${cls}" data-feld="${esc(id)}"${attrs}>&nbsp;</span>`;
@@ -102,26 +149,26 @@ export function renderSlip(fall, r, { interactive = false, compact = false, modu
     <div class="steuer-sv">
       <div class="tabellen">
         <table class="grid">
-          <tr><th>Steuer-Brutto</th><th>Lohnsteuer</th><th>Kirchensteuer</th><th>Solidaritätszuschlag</th></tr>
+          <tr><th>Steuer-Brutto${marke('steuer')}</th><th>Lohnsteuer</th><th>Kirchensteuer</th><th>Solidaritätszuschlag</th></tr>
           <tr><td class="r">${val('stBrutto', r.stBrutto)}</td><td class="r">${val('lst', r.lst)}</td><td class="r">${val('kist', r.kist)}</td><td class="r">${val('soli', r.soli)}</td></tr>
         </table>
         <table class="grid">
-          <tr><th>KV-Brutto</th><th>RV-Brutto</th><th>AV-Brutto</th><th>PV-Brutto</th></tr>
+          <tr><th>KV-Brutto${marke('sozial')}</th><th>RV-Brutto</th><th>AV-Brutto</th><th>PV-Brutto</th></tr>
           <tr><td class="r">${val('kvBrutto', r.kvBrutto)}</td><td class="r">${val('rvBrutto', r.rvBrutto)}</td><td class="r">${val('avBrutto', r.avBrutto)}</td><td class="r">${val('pvBrutto', r.pvBrutto)}</td></tr>
           <tr class="kopf2"><th>${svLabel('KV', r.saetze.kv)}</th><th>${svLabel('RV', r.saetze.rv)}</th><th>${svLabel('AV', r.saetze.av)}</th><th>${svLabel('PV', r.saetze.pv)}</th></tr>
           <tr><td class="r">${val('kv', r.kv)}</td><td class="r">${val('rv', r.rv)}</td><td class="r">${val('av', r.av)}</td><td class="r">${val('pv', r.pv)}</td></tr>
         </table>
       </div>
       <div class="summen">
-        <div class="sum"><span>Steuerrechtliche Abzüge</span>${val('steuerAbzuege', r.steuerAbzuege)}</div>
-        <div class="sum"><span>SV-rechtliche Abzüge</span>${val('svAbzuege', r.svAbzuege)}</div>
-        <div class="sum sum-gross"><span>Netto-Verdienst</span>${val('netto', r.netto)}</div>
+        <div class="sum"><span>Steuerrechtliche Abzüge${marke('steuerabzug')}</span>${val('steuerAbzuege', r.steuerAbzuege)}</div>
+        <div class="sum"><span>SV-rechtliche Abzüge${marke('svabzug')}</span>${val('svAbzuege', r.svAbzuege)}</div>
+        <div class="sum sum-gross"><span>Netto-Verdienst${marke('netto')}</span>${val('netto', r.netto)}</div>
       </div>
     </div>`;
 
   const k = r.kumuliert;
   const verdienst = bloecke.verdienst
-    ? `<section class="block"><h3>Verdienstbescheinigung (seit Januar)</h3>
+    ? `<section class="block"><h3>Verdienstbescheinigung (seit Januar)${marke('verdienst')}</h3>
         <table class="grid"><tr><th>Gesamt-Brutto</th><th>Steuer-Brutto</th><th>Lohnsteuer</th><th>Kirchensteuer</th><th>Solidaritätszuschlag</th></tr>
         <tr><td class="r">${val('kumBrutto', k.brutto)}</td><td class="r">${val('kumStBrutto', k.stBrutto)}</td><td class="r">${val('kumLst', k.lst)}</td><td class="r">${val('kumKist', k.kist)}</td><td class="r">${val('kumSoli', k.soli)}</td></tr></table>
         <table class="grid"><tr><th>SV-Brutto</th><th>KV-Beitrag</th><th>RV-Beitrag</th><th>AV-Beitrag</th><th>PV-Beitrag</th></tr>
@@ -130,18 +177,18 @@ export function renderSlip(fall, r, { interactive = false, compact = false, modu
     : '';
 
   const nettoBlock = bloecke.netto
-    ? `<section class="block"><h3>Netto-Bezüge/-Abzüge</h3><table class="grid liste">
+    ? `<section class="block"><h3>Netto-Bezüge/-Abzüge${marke('nettoabzug')}</h3><table class="grid liste">
         ${r.nettoPosten.map((x) => `<tr><td class="c">${esc(x.lohnart)}</td><td>${esc(x.bezeichnung)}</td><td class="r">${val(`p:${x.id}`, x.betrag)}</td></tr>`).join('') || '<tr><td colspan="3" class="leer">Keine.</td></tr>'}
         <tr class="gesamt"><td></td><td>Summe der Abzüge</td><td class="r">${val('nettoAbzuege', r.nettoAbzuege)}</td></tr></table></section>`
     : '';
 
   const agBlock = bloecke.arbeitgeber
-    ? `<section class="block"><h3>Arbeitgeberseite</h3><table class="grid"><tr><th>Gesamt-Brutto</th><th>SV-AG-Anteil</th><th>Gesamtkosten</th></tr>
+    ? `<section class="block"><h3>Arbeitgeberseite${marke('arbeitgeber')}</h3><table class="grid"><tr><th>Gesamt-Brutto</th><th>SV-AG-Anteil</th><th>Gesamtkosten</th></tr>
         <tr><td class="r">${val('gesamtBrutto', r.gesamtBrutto)}</td><td class="r">${val('agAnteil', r.agAnteil)}</td><td class="r">${val('gesamtKosten', r.gesamtKosten)}</td></tr></table></section>`
     : '';
 
   const fehltage = bloecke.fehltage
-    ? `<section class="block"><h3>Fehltage und Hinweise</h3><div class="kopf">${kopfZelle('Urlaubstage', fall.fehltage.urlaub)}${kopfZelle('Krankheitstage', fall.fehltage.krank)}</div>
+    ? `<section class="block"><h3>Fehltage und Hinweise${marke('fehltage')}</h3><div class="kopf">${kopfZelle('Urlaubstage', fall.fehltage.urlaub)}${kopfZelle('Krankheitstage', fall.fehltage.krank)}</div>
         ${fall.hinweis ? `<p class="hinweis">${esc(fall.hinweis)}</p>` : ''}</section>`
     : '';
 
@@ -151,9 +198,16 @@ export function renderSlip(fall, r, { interactive = false, compact = false, modu
         <div><strong>${esc(fall.bank.name)}</strong><br>${esc(fall.bank.iban)}</div></section>`
     : '';
 
+  const legendeHtml =
+    erklaer && legende
+      ? `<section class="legende" aria-label="Legende"><h3>So liest du die Abrechnung</h3><ol>${erklaerungen(fall)
+          .map((e) => `<li><span class="marke" aria-hidden="true">${e.nr}</span><span><b>${esc(e.titel)}:</b> ${esc(e.text)}</span></li>`)
+          .join('')}</ol></section>`
+      : '';
+
   return `<article class="slip optik-${optik}${compact ? ' slip-compact' : ''}" aria-label="${titel} ${esc(monat)}">
-    <header class="slip-kopf">
-      <h2>${titel} für ${esc(monat)}</h2>
+    <header class="slip-kopf" data-abschnitt="kopf">
+      <h2>${titel} für ${esc(monat)}${marke('kopf')}</h2>
       <div class="kopf">
         ${kopfZelle('Firma', fall.firma.name)}${kopfZelle('Name', p.name)}
         ${kopfZelle('Personal-Nr.', p.personalnr)}${kopfZelle('Steuerklasse', p.steuerklasse)}${kopfZelle('Kinder', p.kinder)}
@@ -161,19 +215,21 @@ export function renderSlip(fall, r, { interactive = false, compact = false, modu
       </div>
     </header>
     ${bank}
-    <section class="block">
-      <h3>Brutto-Bezüge</h3>
+    <section class="block" data-abschnitt="bezuege">
+      <h3>Brutto-Bezüge${marke('bezuege')}</h3>
       <table class="bezuege">
-        <thead><tr><th>Lohnart</th><th>Bezeichnung</th><th>Einheit</th><th>Menge</th><th>Faktor (€)</th><th>Prozent</th><th>St</th><th>SV</th><th>Betrag (€)</th></tr></thead>
+        <thead><tr><th>Lohnart</th><th>Bezeichnung</th><th>Einheit</th><th>Menge</th><th>Faktor (€)</th><th>Prozent</th><th>St${marke('stsv')}</th><th>SV</th><th>Betrag (€)</th></tr></thead>
         <tbody>${zeilen}${leer}</tbody>
-        <tfoot><tr><td colspan="8" class="r"><strong>Gesamt-Brutto</strong></td><td class="r betrag">${val('gesamtBrutto', r.gesamtBrutto)}</td></tr></tfoot>
+        <tfoot><tr><td colspan="8" class="r"><strong>Gesamt-Brutto</strong>${marke('brutto')}</td><td class="r betrag">${val('gesamtBrutto', r.gesamtBrutto)}</td></tr></tfoot>
       </table>
     </section>
-    <section class="block"><h3>Steuer und Sozialversicherung</h3>${steuerBlock}</section>
-    ${verdienst}${nettoBlock}${agBlock}${fehltage}
-    <footer class="slip-fuss">
-      <div class="auszahlung"><span>Auszahlungsbetrag</span>${val('auszahlung', r.auszahlung, 'gross')}</div>
-      <p class="vereinfacht">Vereinfachte Abrechnung für den Unterricht (${r.rates.jahr}) – kein echter Entgeltnachweis. Erfundene Firma und Person.</p>
-    </footer>
+    <section class="block" data-abschnitt="steuer"><h3>Steuer und Sozialversicherung</h3>${steuerBlock}</section>
+    <div class="slip-unten" data-abschnitt="unten">
+      ${verdienst}${nettoBlock}${agBlock}${fehltage}${legendeHtml}
+      <footer class="slip-fuss">
+        <div class="auszahlung"><span>Auszahlungsbetrag${marke('auszahlung')}</span>${val('auszahlung', r.auszahlung, 'gross')}</div>
+        <p class="vereinfacht">Vereinfachte Abrechnung für den Unterricht (${r.rates.jahr}) – kein echter Entgeltnachweis. Erfundene Firma und Person.</p>
+      </footer>
+    </div>
   </article>`;
 }

@@ -3,6 +3,7 @@ import { backupFileName, buildBackup, mergeFaelle, parseBackup } from './backup.
 import { createEditor } from './editor.js';
 import { createLibrary } from './library.js';
 import { duplicateFall } from './model.js';
+import { createPresent } from './present.js';
 import { openStore } from './store.js';
 import { $, fileDeliverable, toast, wireDialogs } from './ui.js';
 import { createZufallDialog } from './zufall-ui.js';
@@ -10,6 +11,10 @@ import { createZufallDialog } from './zufall-ui.js';
 const fallPath = (id) => `#/fall/${encodeURIComponent(id)}`;
 const currentFallId = () => {
   const m = location.hash.match(/^#\/fall\/(.+)$/);
+  return m ? decodeURIComponent(m[1]) : null;
+};
+const currentPresentId = () => {
+  const m = location.hash.match(/^#\/vorfuehren\/(.+)$/);
   return m ? decodeURIComponent(m[1]) : null;
 };
 
@@ -36,8 +41,19 @@ export async function startApp() {
   // --- Navigation ---------------------------------------------------------------------------------
   let editor;
   let library;
+  let present;
   let routing = Promise.resolve();
   async function doRoute() {
+    const presentId = currentPresentId();
+    if (presentId) {
+      await editor.close();
+      if (await present.open(presentId)) {
+        document.title = 'Vorführen – Lohnzettel-Werkstatt';
+        return;
+      }
+      history.replaceState(null, '', '#/');
+    }
+    await present.close();
     const id = currentFallId();
     if (id) {
       if (await editor.open(id)) {
@@ -164,6 +180,7 @@ export async function startApp() {
   // --- Start ----------------------------------------------------------------------------------------
   editor = createEditor(app);
   library = createLibrary(app);
+  present = createPresent(app);
   const zufall = createZufallDialog(app);
   $('#lib-zufall').addEventListener('click', () => zufall.open());
   await app.refreshFaelle();

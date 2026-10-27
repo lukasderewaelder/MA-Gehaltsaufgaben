@@ -151,6 +151,7 @@ function formHtml(fall, r) {
   ${aufgabeForm(fall, r)}
   <details><summary>Aussehen und weitere Blöcke</summary>
     ${select('Optik', 'anzeige.optik', [['modern', 'Klar und modern'], ['original', 'Originalgetreu (Matrixdruck-Stil)']], fall)}
+    ${check('Erklärmodus: nummerierte Marken und Legende', 'anzeige.erklaermodus', fall)}
     ${Object.entries(BLOECKE).map(([k, t]) => check(t, `anzeige.bloecke.${k}`, fall)).join('')}
     ${fall.anzeige.bloecke.fehltage ? `<div class="row">${input('Urlaubstage', 'fehltage.urlaub', 'int', fall)}${input('Krankheitstage', 'fehltage.krank', 'int', fall)}</div>${input('Hinweis', 'hinweis', 'text', fall)}` : ''}
     ${fall.anzeige.bloecke.bank ? input('Bank', 'bank.name', 'text', fall) + input('IBAN', 'bank.iban', 'text', fall) : ''}
@@ -462,6 +463,10 @@ export function createEditor(app) {
   $('#ed-back').addEventListener('click', () => app.go('#/'));
   $('#ed-dup').addEventListener('click', () => app.duplicateFall(fall));
   $('#ed-print').addEventListener('click', () => window.print());
+  $('#ed-present').addEventListener('click', async () => {
+    await flush();
+    app.go(`#/vorfuehren/${encodeURIComponent(fall.id)}`);
+  });
   $('#ed-titel').addEventListener('input', (e) => {
     fall.titel = e.target.value;
     scheduleSave();

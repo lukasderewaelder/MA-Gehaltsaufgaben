@@ -56,6 +56,7 @@
       <button type="button" id="ed-wuerfeln" class="btn" title="Gleiche Einstellungen, neuer Zufall" hidden>Neu würfeln</button>
       <button type="button" id="ed-reset" class="btn" title="Alle von Hand geänderten Felder wieder automatisch rechnen">Felder zurücksetzen</button>
       <button type="button" id="ed-dup" class="btn">Duplizieren</button>
+      <button type="button" id="ed-present" class="btn">Vorführen</button>
       <button type="button" id="ed-print" class="btn btn-primary">Drucken</button>
     </header>
     <div class="ed-body">
@@ -72,6 +73,37 @@
         <div id="slip-host"></div>
         <div id="pages-host"></div>
       </section>
+    </div>
+  </div>
+
+  <!-- Vorführmodus (Beamer, iPad) -->
+  <div id="view-present">
+    <header class="prbar">
+      <button type="button" id="pr-back" class="btn btn-small">← Zurück</button>
+      <strong id="pr-titel" class="pr-titel"></strong>
+      <span class="spacer"></span>
+      <div class="pr-gruppe" role="group" aria-label="Zoom auf einen Abschnitt">
+        <button type="button" class="btn btn-small" data-abschnitt="alles" aria-pressed="true">Ganzer Zettel</button>
+        <button type="button" class="btn btn-small" data-abschnitt="kopf" aria-pressed="false">Kopf</button>
+        <button type="button" class="btn btn-small" data-abschnitt="bezuege" aria-pressed="false">Bezüge</button>
+        <button type="button" class="btn btn-small" data-abschnitt="steuer" aria-pressed="false">Steuer und SV</button>
+        <button type="button" class="btn btn-small" data-abschnitt="unten" aria-pressed="false">Ergebnis</button>
+      </div>
+      <label class="pr-wahl"><span>Verdeckt</span>
+        <select id="pr-modus" aria-label="Was ist verdeckt?">
+          <option value="gesucht">Gesuchte Werte</option>
+          <option value="alle">Alle Ergebnisse</option>
+          <option value="nichts">Nichts</option>
+        </select>
+      </label>
+      <button type="button" id="pr-verdecken" class="btn btn-small">Wieder verdecken</button>
+      <button type="button" id="pr-aufdecken" class="btn btn-small">Alles aufdecken</button>
+      <label class="pr-check"><input type="checkbox" id="pr-erklaer"> Erklärmodus</label>
+      <button type="button" id="pr-voll" class="btn btn-small">Vollbild</button>
+    </header>
+    <div class="pr-body">
+      <div id="pr-stage" class="pr-stage"><div id="pr-slip"></div></div>
+      <aside id="pr-panel" class="pr-panel" aria-live="polite" hidden></aside>
     </div>
   </div>
 

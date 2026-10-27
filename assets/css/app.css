@@ -33,6 +33,41 @@ body[data-view='editor'] #view-library,
 body[data-view='error'] #view-library,
 body[data-view='error'] #view-editor { display: none; }
 
+body[data-view='present'] #view-library,
+body[data-view='present'] #view-editor,
+body:not([data-view='present']) #view-present { display: none; }
+
+/* Vorführmodus */
+#view-present { height: 100vh; height: 100dvh; display: flex; flex-direction: column; background: #e5e7eb; }
+.prbar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #fff; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.pr-titel { max-width: 28ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pr-gruppe { display: flex; gap: 4px; flex-wrap: wrap; }
+.pr-gruppe .btn[aria-pressed='true'] { background: var(--blue); border-color: var(--blue); color: #fff; }
+.pr-wahl { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: var(--muted); }
+.pr-wahl select { font: inherit; min-height: 36px; border: 1px solid var(--line); border-radius: 8px; padding: 0 8px; background: #fff; color: var(--ink); }
+.pr-check { display: flex; align-items: center; gap: 6px; font-size: 0.9rem; min-height: 36px; }
+.pr-check input { width: 20px; height: 20px; }
+.pr-body { flex: 1; display: grid; grid-template-columns: 1fr auto; min-height: 0; }
+.pr-stage { position: relative; overflow: hidden; min-width: 0; }
+#pr-slip { position: absolute; inset: 0; }
+.pr-panel { width: min(360px, 38vw); background: #fff; border-left: 1px solid var(--line); padding: 14px 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+.pr-panel header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.pr-panel h2 { margin: 0; font-size: 1.1rem; }
+.pr-panel h3 { margin: 0 0 4px; font-size: 0.85rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.pr-panel footer { display: flex; gap: 8px; margin-top: auto; }
+.pr-panel footer .btn { flex: 1; }
+.zutaten { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.zutaten li { display: flex; justify-content: space-between; gap: 8px; background: #fef3c7; border-radius: 8px; padding: 6px 10px; }
+.formel { margin: 0; background: #f3f4f6; border-radius: 8px; padding: 8px 10px; font-size: 1.05rem; }
+.ergebnis { margin: 0; font-size: 2rem; font-weight: 700; color: var(--blue-dark); }
+.legende-liste { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.legende-liste li { display: flex; gap: 8px; font-size: 0.95rem; }
+.legende-liste .marke { flex: none; margin-top: 2px; }
+@media (max-width: 760px) {
+  .pr-body { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
+  .pr-panel { width: auto; max-height: 40vh; border-left: 0; border-top: 1px solid var(--line); }
+}
+
 .spacer { flex: 1; }
 .muted { color: var(--muted); font-size: 0.9rem; }
 .hint { color: var(--muted); font-size: 0.9rem; margin: 0 0 8px; }
