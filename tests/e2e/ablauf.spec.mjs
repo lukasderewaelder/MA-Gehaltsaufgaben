@@ -249,6 +249,138 @@ test('Sicherung: erstellen und in einem anderen Browser-Profil einlesen', async 
   await b.context.close();
 });
 
+/** Legt über den Dialog ein Mischblatt an (Arten gewählt oder zufällig) und wartet auf den Editor. */
+async function neuesMischblatt(page, { typen = [], anzahl = 3, gruppen = 1 } = {}) {
+  await page.click('#lib-misch');
+  await page.waitForSelector('#dlg-misch[open]');
+  for (const t of typen) await page.check(`#dlg-misch [data-typ="${t}"]`);
+  await page.selectOption('#dlg-misch [data-k="anzahl"]', String(anzahl));
+  await page.selectOption('#dlg-misch [data-k="gruppen"]', String(gruppen));
+  await page.click('#misch-ok');
+  await page.waitForSelector('#view-misch #mi-pages .page');
+}
+
+test('Mischblatt: erzeugen, Aufgaben ändern, Seiten, Lösung, PDF, Übersicht', async () => {
+  const { context, page, problems, foreign } = await app.openApp();
+  await page.click('#lib-misch');
+  await page.waitForSelector('#dlg-misch[open]');
+  assert.match(await page.textContent('#misch-vorschau'), /Vorschau: /);
+  await page.keyboard.press('Escape');
+  await neuesMischblatt(page, { typen: ['netto', 'quote'], anzahl: 3, gruppen: 2 });
+  assert.equal(await page.locator('.aufgabe-karte').count(), 3);
+  assert.deepEqual(await page.locator('[data-m="typ"]').evaluateAll((s) => s.map((x) => x.value)), ['netto', 'quote', 'netto']);
+  assert.match(await page.inputValue('#mi-titel'), /Gruppe A/);
+  assert.equal(await page.locator('#mi-pages .aufgabe').count(), 3);
+  assert.ok((await page.locator('#mi-pages .page').count()) >= 2, 'mehrere Seiten (mit Beiblatt)');
+  assert.equal(await page.locator('#mi-pages .page.is-overflow').count(), 0);
+
+  // Alle Teilaufgaben stehen in der Operator-Form
+  const texte = await page.locator('#mi-pages .aufgabe .tt').allTextContents();
+  assert.ok(texte.length >= 6);
+  for (const t of texte) assert.match(t, /\b(Berechne|Ermittle|Bestimme|Lies|Trage)\b/, t);
+  assert.ok(texte.every((t) => !t.trim().endsWith('?')));
+
+  // Art der zweiten Aufgabe ändern: neuer Fall, Ausschnitt „Steuer und Sozialversicherung“ mit fünf Lücken
+  await page.selectOption('.aufgabe-karte[data-index="1"] [data-m="typ"]', 'sv');
+  await page.waitForFunction(() => document.querySelectorAll('#mi-pages .aufgabe')[1]?.querySelectorAll('.val.luecke').length === 5);
+  assert.equal(await page.locator('#mi-pages .aufgabe').nth(1).locator('[data-abschnitt="steuer"]').count(), 1);
+
+  // Reihenfolge ändern, Aufgabe hinzufügen und wieder entfernen (mit Rückgängig)
+  await page.click('.aufgabe-karte[data-index="1"] [data-m="hoch"]');
+  assert.equal(await page.locator('[data-m="typ"]').first().inputValue(), 'sv');
+  await page.selectOption('#mi-neu-typ', 'probieren');
+  await page.click('[data-m="add"]');
+  assert.equal(await page.locator('.aufgabe-karte').count(), 4);
+  await page.click('.aufgabe-karte[data-index="3"] [data-m="weg"]');
+  assert.equal(await page.locator('.aufgabe-karte').count(), 3);
+  await page.click('#toast-action');
+  await page.waitForFunction(() => document.querySelectorAll('.aufgabe-karte').length === 4);
+  assert.match(await page.locator('#mi-pages').innerHTML(), /class="mz versuche"/);
+
+  // Lösungsblatt mit Tastatur wählen
+  await page.focus('#mtab-arbeit');
+  await page.keyboard.press('ArrowRight');
+  assert.equal(await page.getAttribute('#mtab-loesung', 'aria-selected'), 'true');
+  assert.ok((await page.locator('#mi-pages .tloesung').count()) >= 4);
+  assert.ok((await page.locator('#mi-pages .val.loesung').count()) >= 5);
+
+  // PDF: nur Arbeits- und Lösungsblatt, keine Jahresübersicht
+  await page.click('#mi-pdf');
+  assert.ok(await page.locator('#pdf-jahr-option').isHidden());
+  await page.click('#pdf-go');
+  await page.waitForFunction(() => document.querySelector('#pdf-status').textContent.startsWith('Fertig'), null, { timeout: 90_000 });
+  const [download] = await Promise.all([page.waitForEvent('download'), page.click('#pdf-download')]);
+  assert.match(download.suggestedFilename(), /Gruppe A.*\.pdf$/);
+  const datei = join(await mkdtemp(join(tmpdir(), 'lohnzettel-')), 'misch.pdf');
+  await download.saveAs(datei);
+  assert.equal((await readFile(datei)).subarray(0, 5).toString(), '%PDF-');
+  await page.keyboard.press('Escape');
+
+  // Übersicht: beide Gruppen als Mischblatt-Karten
+  await app.gespeichert(page);
+  await page.click('#mi-back');
+  await page.waitForSelector('#lib-list .card-misch');
+  const karten = await page.locator('#lib-list .card-misch .card-title').allTextContents();
+  assert.equal(karten.length, 2);
+  assert.ok(karten.some((t) => /Gruppe A/.test(t)) && karten.some((t) => /Gruppe B/.test(t)));
+  keineProbleme(problems, foreign);
+  await context.close();
+});
+
+test('Mischblatt: Zettel einsetzen, neu würfeln, Duplizieren, Sicherung mit Mischblättern', async () => {
+  const a = await app.openApp();
+  await app.neuerZettel(a.page, 'handwerker');
+  await app.gespeichert(a.page);
+  await a.page.click('#ed-back');
+  await a.page.waitForSelector('#lib-list .card');
+  await neuesMischblatt(a.page, { typen: ['bezuege'], anzahl: 2 });
+  await a.page.click('.aufgabe-karte[data-index="0"] [data-m="einsetzen"]');
+  await a.page.waitForSelector('#dlg-pick[open]');
+  await a.page.click('#pick-liste [data-fall]');
+  await a.page.waitForFunction(() => document.querySelector('#mi-pages .aufgabe .sachtext')?.textContent.includes('Jonas Wagner'));
+  assert.match(await a.page.locator('.aufgabe-karte').first().textContent(), /Jonas Wagner/);
+
+  const vorher = await a.page.locator('.aufgabe-karte').nth(1).locator('.muted').first().textContent();
+  await a.page.click('.aufgabe-karte[data-index="1"] [data-m="neu"]');
+  await a.page.waitForFunction((alt) => document.querySelectorAll('.aufgabe-karte')[1].querySelector('.muted').textContent !== alt, vorher);
+
+  await a.page.click('#mi-wuerfeln');
+  await a.page.waitForFunction(() => !document.querySelector('.aufgabe-karte').textContent.includes('Jonas Wagner'));
+  await a.page.click('#toast-action'); // Rückgängig: der eingesetzte Zettel ist wieder da
+  await a.page.waitForFunction(() => document.querySelector('.aufgabe-karte').textContent.includes('Jonas Wagner'));
+
+  await app.gespeichert(a.page);
+  await a.page.click('#mi-dup');
+  await a.page.waitForFunction(() => document.querySelector('#mi-titel').value.includes('(Kopie)'));
+  await app.gespeichert(a.page);
+  await a.page.click('#mi-back');
+  await a.page.waitForFunction(() => document.querySelectorAll('#lib-list .card-misch').length === 2);
+
+  await a.page.click('#lib-backup');
+  await a.page.click('#backup-export');
+  await a.page.waitForSelector('#backup-download:not([hidden])');
+  const [download] = await Promise.all([a.page.waitForEvent('download'), a.page.click('#backup-download')]);
+  const datei = join(await mkdtemp(join(tmpdir(), 'lohnzettel-')), download.suggestedFilename());
+  await download.saveAs(datei);
+  const sicherung = JSON.parse(await readFile(datei, 'utf8'));
+  assert.equal(sicherung.blaetter.length, 2);
+  assert.equal(sicherung.faelle.length, 1);
+  await a.context.close();
+
+  const b = await app.openApp();
+  await b.page.click('#lib-backup');
+  await b.page.setInputFiles('#backup-import', datei);
+  await b.page.waitForFunction(() => document.querySelector('#backup-meldung').textContent.startsWith('Eingelesen: 3 neu'));
+  await b.page.click('#dlg-backup [data-close]');
+  assert.equal(await b.page.locator('#lib-list .card-misch').count(), 2);
+  await b.page.locator('#lib-list .card-misch .card-open').first().click();
+  await b.page.waitForSelector('#mi-pages .page');
+  assert.ok((await b.page.locator('#mi-pages .aufgabe').count()) >= 1);
+  keineProbleme(b.problems, b.foreign);
+  keineProbleme(a.problems, a.foreign);
+  await b.context.close();
+});
+
 test('Registerkarten sind mit der Tastatur bedienbar, Dialoge haben Namen', async () => {
   const { context, page, problems, foreign } = await app.openApp();
   await app.neuerZettel(page);

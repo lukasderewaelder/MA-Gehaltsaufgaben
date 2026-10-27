@@ -35,7 +35,21 @@ body[data-view='error'] #view-editor { display: none; }
 
 body[data-view='present'] #view-library,
 body[data-view='present'] #view-editor,
+body[data-view='present'] #view-misch,
+body[data-view='misch'] #view-library,
+body[data-view='misch'] #view-editor,
+body[data-view='misch'] #view-present,
+body[data-view='editor'] #view-misch,
+body[data-view='library'] #view-misch,
+body[data-view='loading'] #view-misch,
+body[data-view='error'] #view-misch,
 body:not([data-view='present']) #view-present { display: none; }
+
+/* Mischblatt: Aufgabenkarten im Formular */
+.aufgabe-karte { border: 1px solid var(--line); border-radius: 10px; margin: 8px 0 0; padding: 4px 10px 10px; }
+.aufgabe-karte legend { font-weight: 700; padding: 0 4px; }
+.aufgabe-tasten { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.card-typen { font-size: 0.8rem; }
 
 /* Vorführmodus */
 #view-present { height: calc(100vh - var(--safe-top) - var(--safe-bottom)); height: calc(100dvh - var(--safe-top) - var(--safe-bottom)); display: flex; flex-direction: column; background: #e5e7eb; }

@@ -3,7 +3,6 @@ import { berechne } from './calc/payroll.js';
 import { fmtBp, fmtCents, parseScaled } from './calc/money.js';
 import { YEARS } from './calc/rates.js';
 import { BLOECKE, KONFESSIONEN, MONATE, POSTEN_TYPEN, STEUERMODI, newPosten, normalizeFall, pruneOverrides } from './model.js';
-import { canSharePdf, createPdf, downloadPdf, openPdf, pdfFile, safeFilename, sharePdf } from './export-pdf.js';
 import { erzeugeFall, randomSeed } from './generators/faelle.js';
 import { BEITRAEGE, RUECK_TYPEN, STUNDEN_ARTEN, rueckPlan } from './rueck.js';
 import { esc, feldName, renderSlip } from './slip.js';
@@ -102,7 +101,7 @@ function aufgabeForm(fall, r) {
     .join('');
   const teile = (plan ? [] : teilaufgaben(fall, r))
     .map(
-      (t) => `<label class="f"><span>${esc(t.nr)} ${esc(feldName(t.id, fall))}</span><input data-action="teiltext" data-id="${esc(t.id)}" value="${esc(a.texte[t.id] ?? '')}" placeholder="${esc(teilText(fall, r, t.id))}"></label>`,
+      (t, i) => `<label class="f"><span>${esc(t.nr)} ${esc(feldName(t.id, fall))}</span><input data-action="teiltext" data-id="${esc(t.id)}" value="${esc(a.texte[t.id] ?? '')}" placeholder="${esc(teilText(fall, r, t.id, i))}"></label>`,
     )
     .join('');
   return `<details><summary>Arbeitsblatt</summary>
@@ -432,58 +431,11 @@ export function createEditor(app) {
     }
   });
 
-  // --- PDF -------------------------------------------------------------------------------------------
-  const pdfDlg = $('#dlg-pdf');
-  let pdf = null; // { blob, file, name }
-  const pdfStatus = (text, fehler = false) => {
-    const el = $('#pdf-status');
-    el.textContent = text;
-    el.hidden = !text;
-    el.className = fehler ? 'meldung meldung-fehler' : 'meldung';
-  };
-  const pdfButtons = (an) => {
-    $('#pdf-share').hidden = !an || !canSharePdf(pdf.file);
-    $('#pdf-download').hidden = !an;
-    $('#pdf-open').hidden = !an;
-  };
+  // --- PDF (Dialog siehe pdf-ui.js) ---------------------------------------------------------------
   $('#ed-pdf').addEventListener('click', async () => {
     await flush();
-    pdf = null;
-    pdfStatus('');
-    pdfButtons(false);
-    $('#pdf-go').disabled = false;
-    pdfDlg.showModal();
+    app.pdfDialog.open(fall, { jahr: true });
   });
-  $('#pdf-go').addEventListener('click', async () => {
-    const was = pdfDlg.querySelector('input[name="pdf-was"]:checked').value;
-    const modi = was === 'beide' ? ['arbeit', 'loesung'] : was === 'jahr' ? ['jahr-arbeit', 'jahr-loesung'] : [was];
-    const teil = { beide: '', arbeit: ' – Arbeitsblatt', loesung: ' – Lösungsblatt', jahr: ' – Jahresübersicht' }[was];
-    $('#pdf-go').disabled = true;
-    pdfButtons(false);
-    pdfStatus('PDF wird erstellt …');
-    try {
-      const out = await createPdf(fall, modi, { onProgress: (i, n) => pdfStatus(`PDF wird erstellt … Seite ${i} von ${n}`) });
-      const name = `${safeFilename(fall.titel)}${teil}.pdf`;
-      pdf = { blob: out.blob, file: pdfFile(out.blob, name), name };
-      pdfStatus(`Fertig: ${out.seiten} ${out.seiten === 1 ? 'Seite' : 'Seiten'}.${out.ueberlaufen ? ` Achtung: ${out.ueberlaufen} Seite(n) sind sehr voll, der Zettel wurde stark verkleinert.` : ''}`);
-      pdfButtons(true);
-    } catch (err) {
-      console.error(err);
-      pdfStatus(err.message, true);
-    } finally {
-      $('#pdf-go').disabled = false;
-    }
-  });
-  $('#pdf-share').addEventListener('click', async () => {
-    if (!pdf) return;
-    try {
-      if ((await sharePdf(pdf.file)) === 'geteilt') pdfStatus('Geteilt.');
-    } catch (err) {
-      pdfStatus(`Teilen ist fehlgeschlagen: ${err.message}`, true);
-    }
-  });
-  $('#pdf-download').addEventListener('click', () => pdf && downloadPdf(pdf.blob, pdf.name));
-  $('#pdf-open').addEventListener('click', () => pdf && openPdf(pdf.blob));
 
   $('#feld-form').addEventListener('submit', (e) => {
     e.preventDefault();

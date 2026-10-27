@@ -35,6 +35,7 @@
       <span class="spacer"></span>
       <button type="button" id="lib-backup" class="btn">Sicherung</button>
       <button type="button" id="lib-zufall" class="btn">Zufallsfall</button>
+      <button type="button" id="lib-misch" class="btn">Mischblatt</button>
       <button type="button" id="lib-neu" class="btn btn-primary">Neuer Zettel</button>
     </header>
     <div id="backup-reminder" class="banner banner-info" hidden>
@@ -109,6 +110,52 @@
     </div>
   </div>
 
+  <!-- Mischblatt-Editor -->
+  <div id="view-misch">
+    <header class="edbar">
+      <button type="button" id="mi-back" class="btn">← Übersicht</button>
+      <input id="mi-titel" class="ed-titel" type="text" aria-label="Titel des Mischblatts" autocomplete="off">
+      <span class="spacer"></span>
+      <button type="button" id="mi-wuerfeln" class="btn" title="Alle Aufgaben mit den gleichen Einstellungen neu würfeln" hidden>Alle neu würfeln</button>
+      <button type="button" id="mi-dup" class="btn">Duplizieren</button>
+      <button type="button" id="mi-print" class="btn">Drucken</button>
+      <button type="button" id="mi-pdf" class="btn btn-primary">PDF erstellen …</button>
+    </header>
+    <div class="ed-body">
+      <aside id="mi-form" class="ed-form" aria-label="Eingaben"></aside>
+      <section id="mi-preview" class="ed-preview" aria-label="Vorschau">
+        <div class="pane-bar" role="tablist" aria-label="Ansicht">
+          <button type="button" role="tab" id="mtab-arbeit" data-mpane="arbeit" aria-selected="true">Arbeitsblatt</button>
+          <button type="button" role="tab" id="mtab-loesung" data-mpane="loesung" aria-selected="false">Lösungsblatt</button>
+        </div>
+        <p id="mi-hint" class="hint" aria-live="polite"></p>
+        <div id="mi-pages" role="tabpanel"></div>
+      </section>
+    </div>
+  </div>
+
+  <!-- Mischblatt erzeugen -->
+  <dialog id="dlg-misch" aria-labelledby="misch-titel">
+    <form id="misch-form" method="dialog">
+      <h2 id="misch-titel">Mischblatt erzeugen</h2>
+      <p class="muted">Ein Blatt aus mehreren Aufgaben, jede mit eigenem Fall: Vorwärts- und Rückwärtsaufgaben gemischt.</p>
+      <div id="misch-felder"></div>
+      <p id="misch-vorschau" class="weg" aria-live="polite"></p>
+      <div class="dlg-actions">
+        <button type="button" class="btn" data-close>Abbrechen</button>
+        <button type="submit" class="btn btn-primary" id="misch-ok">Erzeugen</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Zettel für eine Aufgabe auswählen -->
+  <dialog id="dlg-pick" aria-labelledby="pick-titel">
+    <h2 id="pick-titel">Zettel einsetzen</h2>
+    <p class="muted">Der Zettel wird als Kopie in die Aufgabe übernommen und auf die gewählte Art eingestellt.</p>
+    <ul id="pick-liste" class="szenarien"></ul>
+    <div class="dlg-actions"><button type="button" class="btn" data-close>Abbrechen</button></div>
+  </dialog>
+
   <!-- Neuer Zettel -->
   <dialog id="dlg-neu" aria-labelledby="neu-titel">
     <h2 id="neu-titel">Neuer Zettel</h2>
@@ -155,7 +202,7 @@
       <label><input type="radio" name="pdf-was" value="beide" checked> Arbeitsblatt und Lösungsblatt (eine Datei)</label>
       <label><input type="radio" name="pdf-was" value="arbeit"> Nur Arbeitsblatt</label>
       <label><input type="radio" name="pdf-was" value="loesung"> Nur Lösungsblatt</label>
-      <label><input type="radio" name="pdf-was" value="jahr"> Jahresübersicht (Aufgabe und Lösung)</label>
+      <label id="pdf-jahr-option"><input type="radio" name="pdf-was" value="jahr"> Jahresübersicht (Aufgabe und Lösung)</label>
     </fieldset>
     <p id="pdf-status" class="meldung" role="status" hidden></p>
     <div class="dlg-actions">

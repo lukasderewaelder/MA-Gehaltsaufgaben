@@ -11,8 +11,10 @@ body[data-view='editor'] #view-editor { display: block !important; }
 #slip-host { zoom: 1 !important; width: 100%; padding: 8mm; }
 .slip { box-shadow: none; border: 0; width: 100%; min-height: 0; padding: 0; }
 
-/* Seiten */
-#pages-host { zoom: 1 !important; width: 794px; margin: 0; }
+/* Seiten (Arbeits-/Lösungsblatt, Jahresübersicht, Mischblatt) */
+body[data-view='misch'] #view-misch { display: block !important; }
+#mi-form, #mi-hint { display: none !important; }
+#pages-host, #mi-pages { zoom: 1 !important; width: 794px; margin: 0; }
 .page { margin: 0 !important; box-shadow: none; break-after: page; page-break-after: always; }
 .page:last-child { break-after: auto; page-break-after: auto; }
 .page.is-overflow { outline: none; }

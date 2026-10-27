@@ -2,7 +2,10 @@
 import { backupFileName, buildBackup, mergeFaelle, parseBackup } from './backup.js';
 import { createEditor } from './editor.js';
 import { createLibrary } from './library.js';
+import { createMischDialog, createMischEditor } from './misch-ui.js';
+import { duplicateMisch } from './misch.js';
 import { duplicateFall } from './model.js';
+import { createPdfDialog } from './pdf-ui.js';
 import { createPresent } from './present.js';
 import { openStore } from './store.js';
 import { $, fileDeliverable, toast, wireDialogs } from './ui.js';
@@ -11,6 +14,11 @@ import { createZufallDialog } from './zufall-ui.js';
 const fallPath = (id) => `#/fall/${encodeURIComponent(id)}`;
 const currentFallId = () => {
   const m = location.hash.match(/^#\/fall\/(.+)$/);
+  return m ? decodeURIComponent(m[1]) : null;
+};
+const mischPath = (id) => `#/misch/${encodeURIComponent(id)}`;
+const currentMischId = () => {
+  const m = location.hash.match(/^#\/misch\/(.+)$/);
   return m ? decodeURIComponent(m[1]) : null;
 };
 const currentPresentId = () => {
@@ -24,10 +32,12 @@ export async function startApp() {
   $('#storage-banner').hidden = store.persistent;
   navigator.storage?.persist?.().catch(() => {});
 
-  const app = { store, settings: await store.getSettings(), faelle: [] };
+  const app = { store, settings: await store.getSettings(), faelle: [], blaetter: [] };
+  /** Lädt Zettel und Mischblätter neu aus dem Speicher. */
   app.refreshFaelle = async () => {
-    app.faelle = await store.listFaelle();
+    [app.faelle, app.blaetter] = await Promise.all([store.listFaelle(), store.listBlaetter()]);
   };
+  app.anzahlGespeichert = () => app.faelle.length + app.blaetter.length;
   app.setSettings = async (patch) => {
     Object.assign(app.settings, patch);
     await Promise.all(Object.entries(patch).map(([k, v]) => store.setSetting(k, v)));
@@ -37,32 +47,37 @@ export async function startApp() {
     app.faelle = [snapshot, ...app.faelle.filter((f) => f.id !== snapshot.id)];
     app.noteChange();
   };
+  app.onBlattSaved = (snapshot) => {
+    app.blaetter = [snapshot, ...app.blaetter.filter((b) => b.id !== snapshot.id)];
+    app.noteChange();
+  };
 
   // --- Navigation ---------------------------------------------------------------------------------
   let editor;
   let library;
   let present;
+  let misch;
   let routing = Promise.resolve();
   async function doRoute() {
     const presentId = currentPresentId();
-    if (presentId) {
-      await editor.close();
-      if (await present.open(presentId)) {
-        document.title = 'Vorführen – Lohnzettel-Werkstatt';
-        return;
-      }
-      history.replaceState(null, '', '#/');
+    const mischId = currentMischId();
+    const fallId = currentFallId();
+    if (!presentId) await present.close();
+    if (!mischId) await misch.close();
+    if (!fallId) await editor.close();
+    if (presentId && (await present.open(presentId))) {
+      document.title = 'Vorführen – Lohnzettel-Werkstatt';
+      return;
     }
-    await present.close();
-    const id = currentFallId();
-    if (id) {
-      if (await editor.open(id)) {
-        document.title = `${editor.getFall().titel} – Lohnzettel-Werkstatt`;
-        return;
-      }
-      history.replaceState(null, '', '#/');
+    if (mischId && (await misch.open(mischId))) {
+      document.title = `${misch.getBlatt().titel} – Lohnzettel-Werkstatt`;
+      return;
     }
-    await editor.close();
+    if (fallId && (await editor.open(fallId))) {
+      document.title = `${editor.getFall().titel} – Lohnzettel-Werkstatt`;
+      return;
+    }
+    if (presentId || mischId || fallId) history.replaceState(null, '', '#/'); // unbekannte Adresse -> Übersicht
     await library.show();
   }
   const route = () => {
@@ -122,6 +137,45 @@ export async function startApp() {
     });
   };
 
+  // --- Mischblätter anlegen, kopieren, löschen ---------------------------------------------------------
+  /** Erzeugte Mischblätter (Gruppen A, B …) speichern und das erste öffnen. */
+  app.createMischblaetter = async (blaetter) => {
+    for (const b of blaetter) await store.saveBlatt(b);
+    await app.refreshFaelle();
+    app.noteChange();
+    await app.go(mischPath(blaetter[0].id));
+    if (blaetter.length > 1) toast(`${blaetter.length} Mischblätter angelegt (Gruppen A bis ${String.fromCharCode(64 + blaetter.length)}). Du findest sie in der Übersicht.`);
+  };
+  app.duplicateBlatt = async (blatt, { open = true } = {}) => {
+    await misch.flush();
+    const kopie = duplicateMisch((await store.getBlatt(blatt.id)) ?? blatt);
+    await store.saveBlatt(kopie);
+    await app.refreshFaelle();
+    app.noteChange();
+    if (open) await app.go(mischPath(kopie.id));
+    else {
+      await library.show();
+      toast(`Kopie „${kopie.titel}“ angelegt.`);
+    }
+  };
+  app.deleteBlatt = async (blatt) => {
+    misch.discard(blatt.id);
+    const snapshot = (await store.getBlatt(blatt.id)) ?? structuredClone(blatt);
+    await store.deleteBlatt(blatt.id);
+    await app.refreshFaelle();
+    if (currentMischId()) await app.go('#/');
+    else await library.show();
+    toast(`„${blatt.titel}“ gelöscht.`, {
+      action: 'Rückgängig',
+      ms: 10_000,
+      onAction: async () => {
+        await store.saveBlatt(snapshot);
+        await app.refreshFaelle();
+        if (document.body.dataset.view === 'library') await library.show();
+      },
+    });
+  };
+
   // --- Sicherung ----------------------------------------------------------------------------------
   let deliverable = null;
   const dlg = $('#dlg-backup');
@@ -133,18 +187,20 @@ export async function startApp() {
   };
   app.backup = {
     async open() {
-      await editor.flush();
+      await Promise.all([editor.flush(), misch.flush()]);
       await app.refreshFaelle();
       meldung('');
       deliverable = null;
       $('#backup-share').hidden = true;
       $('#backup-download').hidden = true;
-      $('#backup-info').textContent = `${app.faelle.length} Zettel gespeichert.`;
+      $('#backup-info').textContent = `${app.faelle.length} Zettel und ${app.blaetter.length} Mischblätter gespeichert.`;
       dlg.showModal();
     },
   };
   $('#backup-export').addEventListener('click', async () => {
-    const json = JSON.stringify(buildBackup(app.faelle), null, 1);
+    await Promise.all([editor.flush(), misch.flush()]);
+    await app.refreshFaelle();
+    const json = JSON.stringify(buildBackup(app.faelle, app.blaetter), null, 1);
     deliverable = fileDeliverable(new Blob([json], { type: 'application/json' }), backupFileName());
     await app.setSettings({ lastBackupAt: Date.now(), changesSinceBackup: 0 });
     if (deliverable.canShare) {
@@ -166,14 +222,16 @@ export async function startApp() {
     e.target.value = '';
     if (!file) return;
     try {
-      const { faelle, ignoriert } = parseBackup(await file.text());
-      const merge = mergeFaelle(app.faelle, faelle);
-      for (const f of merge.zuSpeichern) await store.saveFall(f);
+      const { faelle, blaetter, ignoriert } = parseBackup(await file.text());
+      const mf = mergeFaelle(app.faelle, faelle);
+      const mb = mergeFaelle(app.blaetter, blaetter);
+      for (const f of mf.zuSpeichern) await store.saveFall(f);
+      for (const b of mb.zuSpeichern) await store.saveBlatt(b);
       await app.refreshFaelle();
       await library.show();
-      $('#backup-info').textContent = `${app.faelle.length} Zettel gespeichert.`;
+      $('#backup-info').textContent = `${app.faelle.length} Zettel und ${app.blaetter.length} Mischblätter gespeichert.`;
       meldung(
-        `Eingelesen: ${merge.hinzu} neu, ${merge.aktualisiert} aktualisiert, ${merge.uebersprungen} unverändert${ignoriert ? `, ${ignoriert} unlesbar` : ''}.`,
+        `Eingelesen: ${mf.hinzu + mb.hinzu} neu, ${mf.aktualisiert + mb.aktualisiert} aktualisiert, ${mf.uebersprungen + mb.uebersprungen} unverändert${ignoriert ? `, ${ignoriert} unlesbar` : ''}.`,
       );
     } catch (err) {
       meldung(err.message, true);
@@ -181,17 +239,22 @@ export async function startApp() {
   });
 
   // --- Start ----------------------------------------------------------------------------------------
+  app.pdfDialog = createPdfDialog();
   editor = createEditor(app);
   library = createLibrary(app);
   present = createPresent(app);
+  misch = createMischEditor(app);
   const zufall = createZufallDialog(app);
+  const mischDialog = createMischDialog(app);
   $('#lib-zufall').addEventListener('click', () => zufall.open());
+  $('#lib-misch').addEventListener('click', () => mischDialog.open());
   await app.refreshFaelle();
   await route();
   // Beim Wechsel der App (iPad) oder Schließen sofort speichern, nicht erst nach der kurzen Verzögerung
+  const alleSpeichern = () => Promise.all([editor.flush(), misch.flush()]).catch(() => {});
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') editor.flush().catch(() => {});
+    if (document.visibilityState === 'hidden') alleSpeichern();
   });
-  window.addEventListener('pagehide', () => editor.flush().catch(() => {}));
-  window.__lohnzettel = { app, getFall: () => editor.getFall(), flush: () => editor.flush() };
+  window.addEventListener('pagehide', alleSpeichern);
+  window.__lohnzettel = { app, getFall: () => editor.getFall(), getBlatt: () => misch.getBlatt(), flush: alleSpeichern };
 }

@@ -3,6 +3,7 @@ import { fmtBp, fmtCents } from './calc/money.js';
 import { SPALTEN, jahresRechnung, klassenvergleich, paarvergleich } from './calc/year.js';
 import { berechne } from './calc/payroll.js';
 import { MONATE } from './model.js';
+import { renderMisch } from './mischsheet.js';
 import { esc } from './slip.js';
 import { renderBlatt } from './worksheet.js';
 
@@ -89,21 +90,21 @@ export function jahrTeilaufgaben(fall, j) {
     const sv = j.quoten.kv + j.quoten.rv + j.quoten.av + j.quoten.pv;
     const st = j.quoten.lst + j.quoten.soli + j.quoten.kist;
     teile.push({
-      text: 'Wie viel Prozent vom Jahresbrutto bleiben netto übrig, wie viel gehen an Steuern und an die Sozialversicherung? (auf 0,1 % genau)',
+      text: 'Ermittle, wie viel Prozent vom Jahresbrutto netto übrig bleiben und wie viel an Steuern und an die Sozialversicherung gehen (auf 0,1 % genau).',
       loesung: `Netto ${fmtBp(j.quoten.netto)} %, Steuern ${fmtBp(st)} %, Sozialversicherung ${fmtBp(sv)} %`,
     });
   }
   if (sm) {
-    teile.push({ text: `Warum sind Brutto und Abzüge im ${MONATE[sm - 1]} höher als in den anderen Monaten? Lies im Diagramm nach.`, loesung: 'Es gibt eine Sonderzahlung; sie wird zusätzlich versteuert und verbeitragt (bis zur Beitragsbemessungsgrenze).' });
+    teile.push({ text: `Erkläre, warum Brutto und Abzüge im ${MONATE[sm - 1]} höher sind als in den anderen Monaten. Nutze das Diagramm.`, loesung: 'Es gibt eine Sonderzahlung; sie wird zusätzlich versteuert und verbeitragt (bis zur Beitragsbemessungsgrenze).' });
   }
   if (fall.jahresblatt.vergleich === 'klassen') {
     const v = klassenvergleich(fall);
     const b = bestes(v, 'netto');
-    teile.push({ text: 'Vergleiche das Jahres-Netto in den Steuerklassen. Welche Klasse ist für diese Person am günstigsten?', loesung: `Klasse ${KLASSEN_NAME[b.klasse - 1]}: ${eur(b.netto)} netto im Jahr` });
+    teile.push({ text: 'Vergleiche das Jahres-Netto in den Steuerklassen. Ermittle die günstigste Klasse für diese Person.', loesung: `Klasse ${KLASSEN_NAME[b.klasse - 1]}: ${eur(b.netto)} netto im Jahr` });
   } else if (fall.jahresblatt.vergleich === 'paar') {
     const v = paarvergleich(fall, fall.jahresblatt.partner);
     const b = bestes(v, 'netto');
-    teile.push({ text: 'Berechne für jede Kombination das gemeinsame Netto. Welche Kombination zahlt im Jahr am wenigsten Steuern?', loesung: `Höchstes gemeinsames Netto: ${b.label} mit ${eur(b.netto)}` });
+    teile.push({ text: 'Berechne für jede Kombination das gemeinsame Netto. Ermittle, welche Kombination im Jahr am wenigsten Steuern zahlt.', loesung: `Höchstes gemeinsames Netto: ${b.label} mit ${eur(b.netto)}` });
   }
   return teile;
 }
@@ -139,6 +140,7 @@ export function renderJahr(fall, modus = 'arbeit') {
 
 /** Alle Seiten einer Ansicht: 'arbeit' | 'loesung' (Monatszettel mit Aufgaben) oder 'jahr-arbeit' | 'jahr-loesung'. */
 export function renderSeiten(fall, { modus = 'arbeit', interactive = false } = {}) {
+  if (fall.aufgaben) return renderMisch(fall, { modus }); // Mischblatt (Seitenumbruch macht `paginiere` danach)
   if (modus.startsWith('jahr-')) return renderJahr(fall, modus.slice(5));
   return renderBlatt(fall, berechne(fall), { modus, interactive });
 }

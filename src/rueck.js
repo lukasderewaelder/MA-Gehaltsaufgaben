@@ -24,7 +24,7 @@ const bruttoIds = (r) => [
  * Plan einer Rückwärtsaufgabe oder null (keine gewählt / nicht möglich).
  * Ergebnis: { typ, gesucht (Lücken auf dem Zettel) | null, teile (feste Teilaufgaben) | null, sachtext, ohneZettel, versuche, fehler }
  */
-export function rueckPlan(fall, r) {
+export function rueckPlan(fall, r, { kompakt = false } = {}) {
   const rueck = fall.aufgabe.rueck;
   if (!rueck) return null;
   const p = fall.person;
@@ -42,8 +42,9 @@ export function rueckPlan(fall, r) {
     const kurz = art.toUpperCase();
     return {
       typ: 'beitrag',
-      gesucht: bruttoIds(r),
-      sachtext: `${p.name} arbeitet bei ${fall.firma.name}. Auf der Abrechnung für ${monat} fehlen alle Brutto-Werte. Der Beitrag zur ${name} ist aber bekannt.`,
+      // kompakt (Mischblatt): nur der Ausschnitt „Steuer und Sozialversicherung“ ist zu sehen, dort fehlen die Berechnungsgrundlagen
+      gesucht: kompakt ? ['stBrutto', 'kvBrutto', 'rvBrutto', 'avBrutto', 'pvBrutto'] : bruttoIds(r),
+      sachtext: `${p.name} arbeitet bei ${fall.firma.name}. Auf der Abrechnung für ${monat} fehlen ${kompakt ? 'die Berechnungsgrundlagen' : 'alle Brutto-Werte'}. Der Beitrag zur ${name} ist aber bekannt. Ermittle die fehlenden Werte.`,
       teile: [
         {
           id: 'rueck',
@@ -51,12 +52,16 @@ export function rueckPlan(fall, r) {
           anzeige: eur(basis),
           weg: `${eur(beitrag)} : ${fmtBp(bp)} % = ${eur(rechnen)}${rechnen !== basis ? ` (gerundet, auf dem Zettel: ${eur(basis)})` : ''}`,
         },
-        {
-          id: 'rueck2',
-          text: 'Trage alle fehlenden Brutto-Werte auf dem Zettel ein.',
-          anzeige: eur(r.gesamtBrutto),
-          weg: `Gesamt-Brutto: ${eur(r.gesamtBrutto)}, Steuer-Brutto: ${eur(r.stBrutto)}`,
-        },
+        ...(kompakt
+          ? []
+          : [
+              {
+                id: 'rueck2',
+                text: 'Trage alle fehlenden Brutto-Werte auf dem Zettel ein.',
+                anzeige: eur(r.gesamtBrutto),
+                weg: `Gesamt-Brutto: ${eur(r.gesamtBrutto)}, Steuer-Brutto: ${eur(r.stBrutto)}`,
+              },
+            ]),
       ],
       ohneZettel: false,
     };
@@ -71,7 +76,7 @@ export function rueckPlan(fall, r) {
       typ: 'stundenlohn',
       gesucht: [id],
       teile: null,
-      sachtext: `${p.name} arbeitet bei ${fall.firma.name}. Auf der Abrechnung für ${monat} fehlt ein Wert in der Zeile „${posten.bezeichnung}“. Der Betrag steht auf dem Zettel.`,
+      sachtext: `${p.name} arbeitet bei ${fall.firma.name}. Auf der Abrechnung für ${monat} fehlt ein Wert in der Zeile „${posten.bezeichnung}“. Der Betrag steht auf dem Zettel. Ermittle den fehlenden Wert.`,
       ohneZettel: false,
     };
   }
@@ -85,9 +90,9 @@ export function rueckPlan(fall, r) {
     return {
       typ: 'quote',
       gesucht: [],
-      sachtext: `${p.name} bekommt im ${monat} ${eur(r.netto)} netto. Insgesamt werden ${fmtBp(q)} % vom Brutto für Steuern und Sozialversicherung abgezogen.`,
+      sachtext: `${p.name} bekommt im ${monat} ${eur(r.netto)} netto. Insgesamt werden ${fmtBp(q)} % vom Brutto für Steuern und Sozialversicherung abgezogen. Ermittle das Brutto.`,
       teile: [
-        { id: 'rueck', text: 'Wie viel Prozent vom Brutto bleiben übrig?', anzeige: `${fmtBp(bleibt)} %`, weg: `100 % − ${fmtBp(q)} % = ${fmtBp(bleibt)} %` },
+        { id: 'rueck', text: 'Berechne den Anteil in Prozent, der vom Brutto übrig bleibt.', anzeige: `${fmtBp(bleibt)} %`, weg: `100 % − ${fmtBp(q)} % = ${fmtBp(bleibt)} %` },
         {
           id: 'rueck2',
           text: 'Berechne das Brutto (Netto : Prozentsatz).',
@@ -108,10 +113,10 @@ export function rueckPlan(fall, r) {
     return {
       typ: 'probieren',
       gesucht: [],
-      sachtext: `${p.name} (Steuerklasse ${p.steuerklasse}) möchte im ${monat} ${eur(ziel)} netto bekommen. Wie hoch muss das Brutto sein? Probiere verschiedene Brutto-Beträge aus und rechne jeweils das Netto aus (siehe Beiblatt).`,
+      sachtext: `${p.name} (Steuerklasse ${p.steuerklasse}) möchte im ${monat} ${eur(ziel)} netto bekommen. Ermittle das nötige Brutto. Probiere verschiedene Brutto-Beträge aus und berechne jeweils das Netto (Beitragssätze und Lohnsteuertabelle stehen auf dem Beiblatt und bei der Aufgabe).`,
       teile: [
         { id: 'rueck', text: 'Trage deine Versuche in die Tabelle ein (Brutto und das dazugehörige Netto).', anzeige: '', weg: '' },
-        { id: 'rueck2', text: 'Wie hoch muss das Brutto mindestens sein? (auf 10 € genau)', anzeige: eur(such.brutto), weg: `Bei ${eur(such.brutto)} brutto bleiben ${eur(such.netto)} netto.` },
+        { id: 'rueck2', text: 'Ermittle das Brutto, das mindestens nötig ist (auf 10 € genau).', anzeige: eur(such.brutto), weg: `Bei ${eur(such.brutto)} brutto bleiben ${eur(such.netto)} netto.` },
       ],
       ohneZettel: true,
       versuchstabelle: true,

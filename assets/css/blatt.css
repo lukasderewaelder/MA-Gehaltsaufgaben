@@ -83,6 +83,22 @@
 .jahrtab.vergleich th, .jahrtab.vergleich td { padding: 1px 5px; }
 .page-jahr h3 { margin: 2px 0 0; }
 
+/* Mischblatt */
+#mi-pages { width: 794px; margin: 0 auto; }
+.misch-fluss { width: 714px; display: flex; flex-direction: column; gap: 12px; }
+.aufgabe { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid #d1d5db; padding-top: 8px; flex: none; }
+.aufgabe-kopf { margin: 0; font-size: 14px; }
+.aufgabe-kopf .anr { display: inline-block; background: #eef2ff; border-radius: 6px; padding: 1px 10px; font-size: 14px; }
+.aufgabe .sachtext { margin: 0; }
+.aufgabe .teile { display: grid; gap: 6px; }
+.aufgabe .rz { height: 20px; }
+.ausschnitt .slip { gap: 8px; font-size: 12px; }
+.slip-ausschnitt .slip-unten { margin-top: 0; }
+.aufgabe-tabelle { margin-top: 2px; }
+.aufgabe-tabelle h3 { margin-top: 0; }
+.aufgabe-tabelle .mz.lst td, .aufgabe-tabelle .mz.lst th { padding: 1px 6px; }
+.page-misch { gap: 12px; }
+
 /* Ansicht im Editor */
 .pane-bar { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
 .pane-bar [role='tab'] { font: inherit; min-height: 40px; padding: 0 14px; border: 1px solid var(--line); border-radius: 10px; background: #fff; cursor: pointer; }

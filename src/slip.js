@@ -89,7 +89,8 @@ export function erklaerungen(fall) {
  *        'vorfuehren' (verdeckte Felder als „?“, Zutaten und gewähltes Feld markiert),
  * gesucht: Menge der gesuchten Feld-Ids, hinweis: Text für die Anklick-Hilfe,
  * erklaer: nummerierte Marken, legende: Legende unter dem Zettel (bei Erklärmodus),
- * verdeckt, quellen, aktiv: nur für den Vorführmodus. */
+ * verdeckt, quellen, aktiv: nur für den Vorführmodus,
+ * nur: Menge der Abschnitte, die gezeigt werden ('kopf', 'bezuege', 'steuer', 'unten'); sonst der ganze Zettel. */
 export function renderSlip(
   fall,
   r,
@@ -104,6 +105,7 @@ export function renderSlip(
     verdeckt = new Set(),
     quellen = new Set(),
     aktiv = null,
+    nur = null,
   } = {},
 ) {
   const optik = fall.anzeige.optik;
@@ -205,31 +207,35 @@ export function renderSlip(
           .join('')}</ol></section>`
       : '';
 
-  return `<article class="slip optik-${optik}${compact ? ' slip-compact' : ''}" aria-label="${titel} ${esc(monat)}">
-    <header class="slip-kopf" data-abschnitt="kopf">
+  // Ausschnitt (Mischblatt): nur die genannten Abschnitte 'kopf', 'bezuege', 'steuer', 'unten' zeigen
+  const zeige = (abschnitt) => !nur || nur.has(abschnitt);
+  const ausschnitt = Boolean(nur);
+
+  return `<article class="slip optik-${optik}${compact ? ' slip-compact' : ''}${ausschnitt ? ' slip-ausschnitt' : ''}" aria-label="${titel} ${esc(monat)}">
+    ${zeige('kopf') ? `<header class="slip-kopf" data-abschnitt="kopf">
       <h2>${titel} für ${esc(monat)}${marke('kopf')}</h2>
       <div class="kopf">
         ${kopfZelle('Firma', fall.firma.name)}${kopfZelle('Name', p.name)}
         ${kopfZelle('Personal-Nr.', p.personalnr)}${kopfZelle('Steuerklasse', p.steuerklasse)}${kopfZelle('Kinder', p.kinder)}
         ${kopfZelle('Konfession', p.konfession === 'keine' ? '–' : p.konfession)}${kopfZelle('Krankenkasse', p.krankenkasse)}
       </div>
-    </header>
-    ${bank}
-    <section class="block" data-abschnitt="bezuege">
+    </header>` : ''}
+    ${ausschnitt ? '' : bank}
+    ${zeige('bezuege') ? `<section class="block" data-abschnitt="bezuege">
       <h3>Brutto-Bezüge${marke('bezuege')}</h3>
       <table class="bezuege">
         <thead><tr><th>Lohnart</th><th>Bezeichnung</th><th>Einheit</th><th>Menge</th><th>Faktor (€)</th><th>Prozent</th><th>St${marke('stsv')}</th><th>SV</th><th>Betrag (€)</th></tr></thead>
         <tbody>${zeilen}${leer}</tbody>
         <tfoot><tr><td colspan="8" class="r"><strong>Gesamt-Brutto</strong>${marke('brutto')}</td><td class="r betrag">${val('gesamtBrutto', r.gesamtBrutto)}</td></tr></tfoot>
       </table>
-    </section>
-    <section class="block" data-abschnitt="steuer"><h3>Steuer und Sozialversicherung</h3>${steuerBlock}</section>
-    <div class="slip-unten" data-abschnitt="unten">
+    </section>` : ''}
+    ${zeige('steuer') ? `<section class="block" data-abschnitt="steuer"><h3>Steuer und Sozialversicherung</h3>${steuerBlock}</section>` : ''}
+    ${zeige('unten') ? `<div class="slip-unten" data-abschnitt="unten">
       ${verdienst}${nettoBlock}${agBlock}${fehltage}${legendeHtml}
       <footer class="slip-fuss">
         <div class="auszahlung"><span>Auszahlungsbetrag${marke('auszahlung')}</span>${val('auszahlung', r.auszahlung, 'gross')}</div>
         <p class="vereinfacht">Vereinfachte Abrechnung für den Unterricht (${r.rates.jahr}) – kein echter Entgeltnachweis. Erfundene Firma und Person.</p>
       </footer>
-    </div>
+    </div>` : ''}
   </article>`;
 }

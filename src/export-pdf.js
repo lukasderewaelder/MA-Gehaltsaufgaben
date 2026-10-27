@@ -1,5 +1,6 @@
 // PDF-Export: jede A4-Seite -> Canvas (html2canvas) -> JPEG -> PDF-Seite (jsPDF).
 // Die Seiten werden außerhalb des Bildschirms aufgebaut und dort in den Zettel eingepasst; die sichtbare Vorschau bleibt unberührt.
+import { paginiere } from './mischsheet.js';
 import { PAGE_H, PAGE_W, fitPages } from './worksheet.js';
 import { renderSeiten } from './yearsheet.js';
 
@@ -98,13 +99,14 @@ async function renderCanvas(pageEl, scales) {
   throw new PdfExportError(`Das Blatt konnte nicht in ein Bild umgewandelt werden (${lastError?.message ?? 'unbekannter Fehler'}).`);
 }
 
-/** Baut die gewünschten Blätter ('arbeit', 'loesung') unsichtbar auf und gibt { stage, pages } zurück. */
+/** Baut die gewünschten Blätter ('arbeit', 'loesung', 'jahr-…'; `fall` ist ein Zettel oder ein Mischblatt) unsichtbar auf und gibt { stage, pages } zurück. */
 function buildStage(fall, modi) {
   const stage = document.createElement('div');
   stage.setAttribute('aria-hidden', 'true');
   stage.style.cssText = `position:fixed;left:-10000px;top:0;width:${PAGE_W}px;pointer-events:none`;
   stage.innerHTML = modi.map((modus) => renderSeiten(fall, { modus })).join('');
   document.body.append(stage);
+  paginiere(stage); // Mischblatt: Aufgaben auf Seiten verteilen
   const pages = [...stage.querySelectorAll('.page')];
   pages.forEach((p, i) => {
     p.id = `export-seite-${i + 1}`;

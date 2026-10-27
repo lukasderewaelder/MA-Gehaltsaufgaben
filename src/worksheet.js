@@ -47,57 +47,72 @@ export function verfuegbareFelder(fall, r) {
 
 const eur = (c) => `${fmtCents(c)} €`;
 
-/** Automatischer Text einer Teilaufgabe. */
-export function teilText(fall, r, id) {
+/**
+ * Operatoren der automatischen Aufgabentexte. Bei mehreren Teilaufgaben wechseln die Verben (Index i),
+ * damit nicht jede Zeile mit „Berechne“ beginnt.
+ */
+export const OPERATOREN = {
+  rechnen: ['Berechne', 'Ermittle', 'Bestimme'],
+  ermitteln: ['Ermittle', 'Bestimme', 'Berechne'],
+};
+const op = (art, i) => OPERATOREN[art][((i % 3) + 3) % 3];
+
+/** Automatischer Text einer Teilaufgabe in der Operator-Form („Berechne …“, „Ermittle …“, „Lies … ab“). `i` = Nummer der Teilaufgabe. */
+export function teilText(fall, r, id, i = 0) {
   const k = fall.person.steuerklasse;
   const s = r.saetze;
+  const rechne = op('rechnen', i);
+  const ermittle = op('ermitteln', i);
   if (/^[mfz]:/.test(id)) {
     const p = r.posten.find((x) => x.id === id.slice(2));
     const n = p?.bezeichnung ?? 'Posten';
-    if (id[0] === 'f') return `Berechne den ${p && POSTEN_TYPEN[p.typ].art === 'zuschlag' ? 'Stundenlohn' : 'Faktor (z. B. Stundenlohn)'} in der Zeile „${n}“ (Betrag : Menge${p && POSTEN_TYPEN[p.typ].art === 'zuschlag' ? ' : Prozentsatz' : ''}).`;
-    if (id[0] === 'm') return `Wie viele ${p?.einheit === 'Std' ? 'Stunden' : 'Einheiten'} gehören zu „${n}“? (Betrag : Faktor)`;
-    return `Wie hoch ist der Zuschlagssatz bei „${n}“ in Prozent? (Betrag : (Menge · Stundenlohn))`;
+    const zuschlag = p && POSTEN_TYPEN[p.typ].art === 'zuschlag';
+    if (id[0] === 'f') return `${ermittle} den ${zuschlag ? 'Stundenlohn' : 'Faktor (z. B. Stundenlohn)'} in der Zeile „${n}“ (Betrag : Menge${zuschlag ? ' : Prozentsatz' : ''}).`;
+    if (id[0] === 'm') return `${ermittle} die Anzahl der ${p?.einheit === 'Std' ? 'Stunden' : 'Einheiten'} bei „${n}“ (Betrag : Faktor).`;
+    return `${ermittle} den Zuschlagssatz bei „${n}“ in Prozent (Betrag : (Menge · Stundenlohn)).`;
   }
   if (id.startsWith('p:')) {
     const p = r.posten.find((x) => `p:${x.id}` === id);
     const art = POSTEN_TYPEN[p?.typ]?.art ?? 'pauschal';
     const n = p?.bezeichnung ?? 'Posten';
-    if (art === 'zuschlag') return `Berechne den Betrag für „${n}“ (Menge · Stundenlohn · Prozentsatz).`;
-    if (art === 'menge') return `Berechne den Betrag für „${n}“ (Menge · Faktor).`;
-    return `Wie hoch ist der Betrag für „${n}“?`;
+    if (art === 'zuschlag') return `${rechne} den Betrag für „${n}“ (Menge · Stundenlohn · Prozentsatz).`;
+    if (art === 'menge') return `${rechne} den Betrag für „${n}“ (Menge · Faktor).`;
+    return `${ermittle} den Betrag für „${n}“.`;
   }
   const lst =
     fall.steuer.modus === 'tabelle'
       ? `Lies die Lohnsteuer für Steuerklasse ${k} in der Lohnsteuertabelle ab.`
       : fall.steuer.modus === 'prozent'
-        ? `Berechne die Lohnsteuer: ${fmtBp(fall.steuer.prozent)} % vom Steuer-Brutto.`
-        : 'Bestimme die Lohnsteuer.';
+        ? `${rechne} die Lohnsteuer (${fmtBp(fall.steuer.prozent)} % vom Steuer-Brutto).`
+        : `${ermittle} die Lohnsteuer.`;
+  const grundlage = (name, kurz) => `${ermittle} die Berechnungsgrundlage der ${name} (${kurz}-Brutto). Beachte die Beitragsbemessungsgrenze.`;
+  const beitrag = (name, kurz, bp) => `${rechne} den Beitrag zur ${name} (${fmtBp(bp)} % vom ${kurz}-Brutto).`;
   const texte = {
-    gesamtBrutto: 'Berechne das Gesamt-Brutto (Summe aller Bezüge).',
-    stBrutto: 'Bestimme das Steuer-Brutto. Steuerfreie Bezüge (St = F) zählen nicht mit.',
-    kvBrutto: 'Wie hoch ist die Berechnungsgrundlage der Krankenversicherung (KV-Brutto)? Beachte die Beitragsbemessungsgrenze.',
-    rvBrutto: 'Wie hoch ist die Berechnungsgrundlage der Rentenversicherung (RV-Brutto)? Beachte die Beitragsbemessungsgrenze.',
-    avBrutto: 'Wie hoch ist die Berechnungsgrundlage der Arbeitslosenversicherung (AV-Brutto)? Beachte die Beitragsbemessungsgrenze.',
-    pvBrutto: 'Wie hoch ist die Berechnungsgrundlage der Pflegeversicherung (PV-Brutto)? Beachte die Beitragsbemessungsgrenze.',
+    gesamtBrutto: `${rechne} das Gesamt-Brutto (Summe aller Bezüge).`,
+    stBrutto: `${ermittle} das Steuer-Brutto. Steuerfreie Bezüge (St = F) zählen nicht mit.`,
+    kvBrutto: grundlage('Krankenversicherung', 'KV'),
+    rvBrutto: grundlage('Rentenversicherung', 'RV'),
+    avBrutto: grundlage('Arbeitslosenversicherung', 'AV'),
+    pvBrutto: grundlage('Pflegeversicherung', 'PV'),
     lst,
-    soli: 'Berechne den Solidaritätszuschlag (5,5 % der Lohnsteuer, sofern die Freigrenze überschritten ist).',
+    soli: `${rechne} den Solidaritätszuschlag (5,5 % der Lohnsteuer, sofern die Freigrenze überschritten ist).`,
     kist:
       fall.person.konfession === 'keine'
-        ? 'Wie hoch ist die Kirchensteuer? (Keine Konfession.)'
-        : `Berechne die Kirchensteuer (${fmtBp(r.steuerDetail.kistBp)} % der Lohnsteuer).`,
-    kv: `Berechne den Beitrag zur Krankenversicherung (${fmtBp(s.kv)} % vom KV-Brutto).`,
-    rv: `Berechne den Beitrag zur Rentenversicherung (${fmtBp(s.rv)} % vom RV-Brutto).`,
-    av: `Berechne den Beitrag zur Arbeitslosenversicherung (${fmtBp(s.av)} % vom AV-Brutto).`,
-    pv: `Berechne den Beitrag zur Pflegeversicherung (${fmtBp(s.pv)} % vom PV-Brutto).`,
-    steuerAbzuege: 'Berechne die steuerrechtlichen Abzüge (Lohnsteuer + Solidaritätszuschlag + Kirchensteuer).',
-    svAbzuege: 'Berechne die SV-rechtlichen Abzüge (Summe der vier Sozialversicherungsbeiträge).',
-    netto: 'Berechne den Netto-Verdienst (Gesamt-Brutto minus alle Abzüge).',
-    nettoAbzuege: 'Wie hoch sind die Abzüge vom Netto insgesamt?',
-    auszahlung: 'Wie viel Euro werden ausgezahlt?',
-    agAnteil: 'Berechne den Arbeitgeberanteil zur Sozialversicherung.',
-    gesamtKosten: 'Wie hoch sind die Gesamtkosten für den Arbeitgeber (Brutto plus Arbeitgeberanteil)?',
+        ? `${ermittle} die Kirchensteuer. (Keine Konfession.)`
+        : `${rechne} die Kirchensteuer (${fmtBp(r.steuerDetail.kistBp)} % der Lohnsteuer).`,
+    kv: beitrag('Krankenversicherung', 'KV', s.kv),
+    rv: beitrag('Rentenversicherung', 'RV', s.rv),
+    av: beitrag('Arbeitslosenversicherung', 'AV', s.av),
+    pv: beitrag('Pflegeversicherung', 'PV', s.pv),
+    steuerAbzuege: `${rechne} die steuerrechtlichen Abzüge (Lohnsteuer + Solidaritätszuschlag + Kirchensteuer).`,
+    svAbzuege: `${rechne} die SV-rechtlichen Abzüge (Summe der vier Sozialversicherungsbeiträge).`,
+    netto: `${rechne} den Netto-Verdienst (Gesamt-Brutto minus alle Abzüge).`,
+    nettoAbzuege: `${rechne} die Abzüge vom Netto insgesamt.`,
+    auszahlung: `${rechne} den Auszahlungsbetrag.`,
+    agAnteil: `${rechne} den Arbeitgeberanteil zur Sozialversicherung.`,
+    gesamtKosten: `${rechne} die Gesamtkosten für den Arbeitgeber (Brutto plus Arbeitgeberanteil).`,
   };
-  return texte[id] ?? `Bestimme: ${feldName(id, fall)}.`;
+  return texte[id] ?? `${ermittle} den Wert „${feldName(id, fall)}“.`;
 }
 
 export function sachtextAuto(fall, hatGesucht, plan = null) {
@@ -121,55 +136,66 @@ export function teilaufgaben(fall, r, plan = rueckPlan(fall, r)) {
   return gesuchteFelder(fall, r, plan).map((id, i) => ({
     id,
     nr: buchstabe(i),
-    text: plan ? teilText(fall, r, id) : fall.aufgabe.texte[id] ?? teilText(fall, r, id),
+    text: plan ? teilText(fall, r, id, i) : fall.aufgabe.texte[id] ?? teilText(fall, r, id, i),
     wert: r.werte[id],
     anzeige: fmtWert(id, r.werte[id], fall),
     weg: r.weg[id]?.text ?? '',
   }));
 }
 
-// --- Beiblatt „Abzüge im Überblick“ -----------------------------------------------------------------
-export function merkzettel(fall, r, { modus = 'arbeit' } = {}) {
+// --- Lohnsteuertabelle und Beiblatt „Abzüge im Überblick“ ---------------------------------------------
+/**
+ * Ausschnitt der Lohnsteuertabelle (Monat) um die Zeile des Steuer-Brutto: `halbe` Zeilen darüber und darunter.
+ * Im Lösungsblatt sind Zeile und Spalte der Steuerklasse markiert. Leer, wenn die Lohnsteuer nicht aus der Tabelle kommt.
+ */
+export function lohnsteuerTabelle(fall, r, { modus = 'arbeit', halbe = 6 } = {}) {
   const rates = r.rates;
   const k = fall.person.steuerklasse;
+  if (fall.steuer.modus === 'prozent') return `<h3>Lohnsteuer</h3><p>Die Lohnsteuer beträgt hier <b>${fmtBp(fall.steuer.prozent)} %</b> vom Steuer-Brutto.</p>`;
+  if (fall.steuer.modus !== 'tabelle') return '<h3>Lohnsteuer</h3><p>Die Lohnsteuer richtet sich nach dem Steuertarif, Steuerklasse und Kinderzahl. Sie wird in der Aufgabe angegeben.</p>';
+  const mitte = r.steuerDetail.tabelle?.von ?? tabellenStufe(r.stBrutto).von;
+  const stufe = 5000;
+  // Beim „Probieren“ (gesucht ist das Brutto) steht die Zeile des Ergebnisses nicht in der Mitte: sonst verriete die Tabelle die Lösung
+  const versatz = fall.aufgabe.rueck?.typ === 'probieren' ? -3 : 0;
+  const reihen = [];
+  for (let i = -halbe; i <= halbe; i++) {
+    const von = mitte + (i + versatz) * stufe;
+    if (von >= 0) reihen.push(von);
+  }
+  const klassen = [1, 2, 3, 4, 5, 6];
+  const kopf = klassen.map((c) => `<th class="r${modus === 'loesung' && c === k ? ' treffer' : ''}">Klasse ${['I', 'II', 'III', 'IV', 'V', 'VI'][c - 1]}</th>`).join('');
+  const body = reihen
+    .map((von) => {
+      const zeile = tabellenLohnsteuer(von, 1, rates, stufe);
+      const treffer = modus === 'loesung' && von === mitte;
+      const zellen = klassen
+        .map((c) => `<td class="r${treffer ? ' treffer' : ''}${modus === 'loesung' && c === k ? ' spalte' : ''}">${fmtCents(tabellenLohnsteuer(von, c, rates, stufe).lohnsteuer)}</td>`)
+        .join('');
+      return `<tr><td>${fmtCents(zeile.von)} bis ${fmtCents(zeile.bis)}</td>${zellen}</tr>`;
+    })
+    .join('');
+  return `<h3>Lohnsteuertabelle (Monat, Ausschnitt)</h3>
+      <table class="mz lst"><thead><tr><th>Steuer-Brutto</th>${kopf}</tr></thead><tbody>${body}</tbody></table>
+      <p class="klein">Beträge in Euro. Die Tabelle ist vereinfacht und berücksichtigt keine Kinderfreibeträge.</p>`;
+}
+
+/**
+ * Beiblatt mit Beitragssätzen, Beitragsbemessungsgrenzen, Soli und Kirchensteuer (und Lohnsteuertabelle).
+ * allgemein: Sätze ohne persönliche Zu- und Abschläge (für Mischblätter mit mehreren Personen);
+ * tabelle: false lässt die Lohnsteuertabelle weg (steht dann bei den Aufgaben).
+ */
+export function merkzettel(fall, r, { modus = 'arbeit', allgemein = false, tabelle = true } = {}) {
+  const rates = r.rates;
   const zusatz = fall.person.zusatzbeitrag;
   const s = r.saetze;
   const zeilen = [
     ['Krankenversicherung (KV)', `${fmtBp(rates.kvAllgemein * 2)} % + Zusatzbeitrag ${fmtBp(zusatz)} % = ${fmtBp(rates.kvAllgemein * 2 + zusatz)} %`, `${fmtBp(s.kv)} %`],
     ['Rentenversicherung (RV)', `${fmtBp(rates.rv * 2)} %`, `${fmtBp(s.rv)} %`],
     ['Arbeitslosenversicherung (AV)', `${fmtBp(rates.av * 2)} %`, `${fmtBp(s.av)} %`],
-    ['Pflegeversicherung (PV)', `${fmtBp(rates.pv * 2)} %`, `${fmtBp(s.pv)} %`],
+    ['Pflegeversicherung (PV)', `${fmtBp(rates.pv * 2)} %`, `${fmtBp(allgemein ? rates.pv : s.pv)} %`],
   ];
   const sv = zeilen.map(([n, ges, an]) => `<tr><td>${esc(n)}</td><td class="r">${esc(ges)}</td><td class="r"><b>${an}</b></td></tr>`).join('');
-
-  let steuer;
-  if (fall.steuer.modus === 'tabelle') {
-    const mitte = r.steuerDetail.tabelle?.von ?? tabellenStufe(r.stBrutto).von;
-    const stufe = 5000;
-    const reihen = [];
-    for (let i = -6; i <= 6; i++) {
-      const von = mitte + i * stufe;
-      if (von >= 0) reihen.push(von);
-    }
-    const kopf = [1, 2, 3, 4, 5, 6].map((c) => `<th class="r${modus === 'loesung' && c === k ? ' treffer' : ''}">Klasse ${['I', 'II', 'III', 'IV', 'V', 'VI'][c - 1]}</th>`).join('');
-    const body = reihen
-      .map((von) => {
-        const zeile = tabellenLohnsteuer(von, 1, rates, stufe);
-        const treffer = modus === 'loesung' && von === mitte;
-        const zellen = [1, 2, 3, 4, 5, 6]
-          .map((c) => `<td class="r${treffer ? ' treffer' : ''}${modus === 'loesung' && c === k ? ' spalte' : ''}">${fmtCents(tabellenLohnsteuer(von, c, rates, stufe).lohnsteuer)}</td>`)
-          .join('');
-        return `<tr><td>${fmtCents(zeile.von)} bis ${fmtCents(zeile.bis)}</td>${zellen}</tr>`;
-      })
-      .join('');
-    steuer = `<h3>Lohnsteuertabelle (Monat, Ausschnitt)</h3>
-      <table class="mz lst"><thead><tr><th>Steuer-Brutto</th>${kopf}</tr></thead><tbody>${body}</tbody></table>
-      <p class="klein">Beträge in Euro. Die Tabelle ist vereinfacht und berücksichtigt keine Kinderfreibeträge.</p>`;
-  } else if (fall.steuer.modus === 'prozent') {
-    steuer = `<h3>Lohnsteuer</h3><p>Die Lohnsteuer beträgt hier <b>${fmtBp(fall.steuer.prozent)} %</b> vom Steuer-Brutto.</p>`;
-  } else {
-    steuer = '<h3>Lohnsteuer</h3><p>Die Lohnsteuer richtet sich nach dem Steuertarif, Steuerklasse und Kinderzahl. Sie wird in der Aufgabe angegeben.</p>';
-  }
+  const steuer = tabelle ? lohnsteuerTabelle(fall, r, { modus }) : '<h3>Lohnsteuer</h3><p>Die Lohnsteuertabellen stehen bei den Aufgaben.</p>';
 
   return `<section class="page page-bei" data-seite="beiblatt">
     <header class="page-kopf"><div><h1>Abzüge im Überblick ${rates.jahr}</h1>${modus === 'loesung' ? '<span class="stempel">Lösung</span>' : ''}</div></header>
@@ -186,7 +212,7 @@ export function merkzettel(fall, r, { modus = 'arbeit' } = {}) {
 }
 
 // --- Seiten ---------------------------------------------------------------------------------------------
-const linien = (n) => Array.from({ length: n }, () => '<div class="rz"></div>').join('');
+export const linien = (n) => Array.from({ length: n }, () => '<div class="rz"></div>').join('');
 
 /** Seiten als HTML: Aufgabenblatt (oder nur Zettel) und, wenn gewählt, das Beiblatt. */
 export function renderBlatt(fall, r, { modus = 'arbeit', interactive = false } = {}) {
@@ -231,7 +257,7 @@ export function renderBlatt(fall, r, { modus = 'arbeit', interactive = false } =
 }
 
 /** Tabelle zum Ausprobieren: leer im Arbeitsblatt, mit den Versuchen der Lösung im Lösungsblatt. */
-function versuche(modus, plan) {
+export function versuche(modus, plan) {
   const zeilen = modus === 'loesung'
     ? plan.versuche.map((v) => `<tr><td class="r">${fmtCents(v.brutto)}</td><td class="r">${fmtCents(v.netto)}</td><td class="r">${v.netto >= plan.ziel ? 'reicht' : 'zu wenig'}</td></tr>`).join('')
     : Array.from({ length: 6 }, () => '<tr><td>&nbsp;</td><td></td><td></td></tr>').join('');
