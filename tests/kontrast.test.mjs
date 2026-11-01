@@ -41,6 +41,12 @@ test('Farbwerte der App sind lesbar', () => {
   }
 });
 
+test('Beiblatt: Akzentfarbe und graue Hinweise sind lesbar', () => {
+  assert.ok(kontrast('#1e3a8a', '#ffffff') >= 4.5, 'Akzent auf Weiß');
+  assert.ok(kontrast('#374151', '#ffffff') >= 4.5, 'Hinweise auf Weiß');
+  assert.match(css('blatt.css'), /--akzent:\s*#1e3a8a/);
+});
+
 test('Marken, verdeckte Werte und Lösungsstempel sind lesbar', () => {
   const marke = regel(slip, '.marke', 'background');
   assert.ok(marke);

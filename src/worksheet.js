@@ -96,7 +96,7 @@ export function teilText(fall, r, id, i = 0) {
           ? `${ermittle} den Steuersatz in der Tabelle auf dem Beiblatt (Steuerklasse ${k}, Zeile mit dem Brutto). Berechne damit die Lohnsteuer: ${einfach ? 'Brutto' : 'Steuer-Brutto'} · Steuersatz.`
           : `${rechne} die Lohnsteuer. Der Steuersatz ist ${satz} %. Rechne ${satz} % vom ${einfach ? 'Brutto' : 'Steuer-Brutto'}.`
         : `${ermittle} die Lohnsteuer.`;
-  const grundlage = (name, kurz) => `${ermittle} das ${kurz}-Brutto. Von diesem Betrag wird der Beitrag zur ${name} berechnet. Bei hohem Gehalt gibt es eine Obergrenze.`;
+  const grundlage = (name, kurz) => `${ermittle} das ${kurz}-Brutto für die ${name}. Beachte die Obergrenze.`;
   const beitrag = (name, kurz, bp) => `${rechne} den Beitrag zur ${name}. Rechne ${fmtBp(bp)} % vom ${brutto(kurz)}.`;
   const texte = {
     gesamtBrutto: `${rechne} das Gesamt-Brutto. Zähle alle Beträge zusammen.`,
@@ -251,7 +251,7 @@ export function merkzettel(fall, r, { modus = 'arbeit', allgemein = false, tabel
   if (fall.steuer.modus === 'prozent') {
     steuer = `<p>Die <b>Lohnsteuer</b> bekommt der Staat. In diesen Aufgaben rechnen wir mit einem <b>festen Steuersatz</b>.</p>
       <p class="formel">Lohnsteuer = Brutto · Steuersatz</p>
-      <p><b>Beispiel:</b> Brutto 2.000 €, Steuersatz ${fmtSatz(bspSatz)} %. Rechnung: 2.000 € · ${fmtSatz(bspSatz)} % = <b>${von(bpOf(bsp, bspSatz))}</b>.</p>
+      <p class="rechnung">Beispiel: Brutto 2.000 €, Steuersatz ${fmtSatz(bspSatz)} %. Rechnung: 2.000 € · ${fmtSatz(bspSatz)} % = <b>${von(bpOf(bsp, bspSatz))}</b></p>
       ${satzTabelleHtml(fall, r, { modus })}`;
   } else if (fall.steuer.modus === 'tabelle') {
     steuer = `<p>Die <b>Lohnsteuer</b> bekommt der Staat. Wie viel es ist, hängt vom Brutto und von der Steuerklasse ab. Du liest sie in der Tabelle ab.</p>
@@ -271,15 +271,17 @@ export function merkzettel(fall, r, { modus = 'arbeit', allgemein = false, tabel
     <p><b>Brutto</b> ist das Geld, bevor etwas abgezogen wird. <b>Netto</b> bleibt übrig, wenn alle Abzüge weg sind.</p>
     <p class="formel">Netto = Brutto − Steuern − Sozialabgaben</p>
     <h3>2 · Sozialabgaben</h3>
-    <p>Mit den Sozialabgaben ist man gegen Krankheit, im Alter, bei Arbeitslosigkeit und bei Pflege abgesichert. Jede Abgabe ist ein <b>Prozentsatz vom ${einfach ? 'Brutto' : 'Brutto (KV-, RV-, AV- oder PV-Brutto)'}</b>. Der Chef zahlt die Hälfte. Du zahlst deinen Teil.</p>
+    <p>Mit den Sozialabgaben ist man gegen Krankheit, im Alter, bei Arbeitslosigkeit und bei Pflege abgesichert. Jede Abgabe ist ein <b>Prozentsatz vom Brutto</b>${einfach ? '' : ' (KV-, RV-, AV- oder PV-Brutto)'}. Der Chef zahlt die Hälfte. Du zahlst deinen Teil.</p>
     <table class="mz"><thead><tr><th>Versicherung</th><th>Wofür?</th><th class="r">Zusammen</th><th class="r">Dein Teil</th></tr></thead><tbody>${sv}</tbody></table>
-    <p><b>Beispiel:</b> Brutto 2.000 €, Rentenversicherung ${fmtBp(rates.rv)} %. Rechnung: 2.000 € · ${fmtBp(rates.rv)} % = <b>${von(bpOf(bsp, rates.rv))}</b>. <span class="klein">(Tipp: ${fmtBp(rates.rv)} % = ${fmtBp(rates.rv)} : 100 = ${(rates.rv / 10000).toString().replace('.', ',')}.)</span></p>
+    <p class="rechnung">Beispiel: Brutto 2.000 €, Rentenversicherung ${fmtBp(rates.rv)} %. Rechnung: 2.000 € · ${fmtBp(rates.rv)} % = <b>${von(bpOf(bsp, rates.rv))}</b></p>
+    <p class="klein">Tipp: ${fmtBp(rates.rv)} % = ${fmtBp(rates.rv)} : 100 = ${(rates.rv / 10000).toString().replace('.', ',')}.</p>
     <p class="klein">Pflegeversicherung: Wer keine Kinder hat und mindestens 23 Jahre alt ist, zahlt ${fmtBp(rates.pvKinderlosZuschlag)} % mehr. Ab dem 2. Kind gibt es ${fmtBp(rates.pvAbschlagProKind)} % weniger je Kind.</p>
     ${einfach ? '' : `<p><b>Obergrenze:</b> Bei sehr hohem Gehalt wird nicht alles verrechnet. Für KV und PV zählen höchstens ${eur(rates.bbgKv)} im Monat, für RV und AV höchstens ${eur(rates.bbgRv)}.</p>`}
     <h3>3 · Steuern</h3>
     ${steuer}
     ${soli}
-    <p><b>Kirchensteuer:</b> Nur wer in der Kirche ist (ev oder rk), zahlt sie. Sie beträgt ${fmtBp(kistBp)} % von der Lohnsteuer. Beispiel: Lohnsteuer 300 € · ${fmtBp(kistBp)} % = <b>${von(kistBeispiel)}</b>.</p>
+    <p><b>Kirchensteuer:</b> Nur wer in der Kirche ist (ev oder rk), zahlt sie. Sie beträgt ${fmtBp(kistBp)} % von der Lohnsteuer.</p>
+    <p class="rechnung">Beispiel: Lohnsteuer 300 €. Rechnung: 300 € · ${fmtBp(kistBp)} % = <b>${von(kistBeispiel)}</b></p>
     <p class="klein"><b>Steuerklassen:</b> I = ledig. II = alleinerziehend. III und V = verheiratet (einer zahlt weniger, der andere mehr). IV = verheiratet mit ähnlichem Verdienst. VI = zweite Arbeitsstelle.</p>
     <h3>4 · So kommt das Netto heraus</h3>
     <ol class="schritte"><li>Rechne das Brutto aus.</li><li>Ziehe die Steuern ab.</li><li>Ziehe die vier Sozialabgaben ab.</li><li>Das Ergebnis ist das Netto.</li></ol>

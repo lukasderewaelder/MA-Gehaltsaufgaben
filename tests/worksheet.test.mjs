@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { berechne } from '../src/calc/payroll.js';
 import { fmtCents } from '../src/calc/money.js';
@@ -184,4 +185,15 @@ test('Alle Szenarien ergeben ein vollständiges Blatt', () => {
       assert.ok(!html.includes('NaN') && !html.includes('undefined'), `${s.id}/${modus}`);
     }
   }
+});
+
+test('Beiblatt: jede Beispielrechnung steht in einer eigenen, nicht umbrechenden Zeile', () => {
+  const f = fall();
+  f.steuer.modus = 'prozent';
+  const html = merkzettel(f, berechne(f), { modus: 'arbeit' });
+  const rechnungen = html.match(/<p class="rechnung">[^]*?<\/p>/g) ?? [];
+  assert.equal(rechnungen.length, 3, 'Rentenversicherung, Lohnsteuer, Kirchensteuer');
+  for (const r of rechnungen) assert.match(r, / = <b>[\d.,]+ €<\/b><\/p>$/);
+  assert.doesNotMatch(html.replace(/<p class="rechnung">[^]*?<\/p>/g, ''), / = <b>/, 'keine Rechnung außerhalb');
+  assert.match(readFileSync(new URL('../assets/css/blatt.css', import.meta.url), 'utf8'), /\.page-bei \.rechnung\s*\{[^}]*white-space:\s*nowrap/);
 });

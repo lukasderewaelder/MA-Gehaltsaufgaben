@@ -542,3 +542,45 @@ test('Kassenzettel: erzeugen, ändern, gesucht, Lösung, PDF, Wiederfinden', asy
   keineProbleme(problems, foreign);
   await context.close();
 });
+
+/** Zählt Zeilen der Texte und prüft Rechnungen und Überlauf im sichtbaren Blattbereich. */
+const umbruchPruefen = (page, wurzel) =>
+  page.evaluate((sel) => {
+    const root = document.querySelector(sel);
+    const zoom = Number(root.style.zoom) || 1;
+    const zeilen = (el) => Math.round(el.getBoundingClientRect().height / zoom / (parseFloat(getComputedStyle(el).lineHeight) || 16));
+    return {
+      lang: [...root.querySelectorAll('.tt, .sachtext')].filter((e) => zeilen(e) > 2).map((e) => e.textContent.slice(0, 60)),
+      umbruch: [...root.querySelectorAll('.rechnung')].filter((e) => e.scrollWidth > e.clientWidth + 1 || e.getClientRects().length > 1).map((e) => e.textContent.slice(0, 60)),
+      rechnungen: root.querySelectorAll('.rechnung').length,
+      voll: [...root.querySelectorAll('.page.is-overflow')].length,
+    };
+  }, wurzel);
+
+test('Nichts bricht um: Rechnungen in einer Zeile, Aufgabentexte höchstens zwei Zeilen, Beiblätter passen auf die Seite', async () => {
+  const { context, page, problems, foreign } = await app.openApp();
+  for (const szenario of ['verkaeuferin', 'handwerker']) {
+    await app.neuerZettel(page, szenario);
+    for (const einfach of [false, true]) {
+      if (einfach) await page.check('[data-bind="anzeige.einfach"]');
+      await page.click('[data-pane="arbeit"]');
+      await page.waitForSelector('#pages-host [data-seite="beiblatt"]');
+      const m = await umbruchPruefen(page, '#pages-host');
+      assert.deepEqual([m.lang, m.umbruch, m.voll], [[], [], 0], `${szenario} ${einfach}`);
+      assert.ok(m.rechnungen >= 3, 'Beispielrechnungen stehen als eigene Zeilen');
+      await page.click('[data-pane="zettel"]');
+    }
+    await page.click('#ed-back');
+  }
+  await page.click('#lib-bon');
+  await page.check('input[name="bstufe"][value="schwer"]');
+  await page.click('#bon-ok');
+  await page.waitForSelector('#bon-pages .bon');
+  await page.click('[data-bpane="arbeit"]');
+  await page.waitForSelector('#bon-pages [data-seite="beiblatt"]');
+  const b = await umbruchPruefen(page, '#bon-pages');
+  assert.deepEqual([b.lang, b.umbruch, b.voll], [[], [], 0]);
+  assert.ok(b.rechnungen >= 5);
+  keineProbleme(problems, foreign);
+  await context.close();
+});

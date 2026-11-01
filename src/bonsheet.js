@@ -83,15 +83,21 @@ export function bonBeiblatt(bon) {
     <p>Hinter jedem Preis steht ein Buchstabe. Er sagt dir, welcher Satz gilt.</p>
     <h3>3 · Netto ist gegeben</h3>
     <p class="formel">MwSt. = Netto · Steuersatz</p>
-    <p><b>Beispiel:</b> Netto 100,00 €, Steuersatz ${satzText('A')}. Rechnung: 100,00 € · ${satzText('A')} = <b>${fmtCents(stNetto)} €</b>. Brutto: 100,00 € + ${fmtCents(stNetto)} € = <b>${fmtCents(beispiel + stNetto)} €</b>.</p>
+    <p>Beispiel: Netto 100,00 €, Steuersatz ${satzText('A')}.</p>
+    <p class="rechnung">MwSt.: 100,00 € · ${satzText('A')} = <b>${fmtCents(stNetto)} €</b></p>
+    <p class="rechnung">Brutto: 100,00 € + ${fmtCents(stNetto)} € = <b>${fmtCents(beispiel + stNetto)} €</b></p>
     <h3>4 · Brutto ist gegeben</h3>
     <p class="formel">Netto = Brutto : ${bruttoTeiler('A')} (bei ${satzText('A')}) oder Brutto : ${bruttoTeiler('B')} (bei ${satzText('B')})</p>
-    <p><b>Beispiel:</b> Brutto 100,00 €, Steuersatz ${satzText('A')}. Netto: 100,00 € : ${bruttoTeiler('A')} = <b>${fmtCents(netto)} €</b>. MwSt.: 100,00 € − ${fmtCents(netto)} € = <b>${fmtCents(beispiel - netto)} €</b>.</p>
-    <p>Du darfst nicht ${satzText('A')} vom Brutto rechnen. Das Brutto ist schon mehr als 100 %.</p>
+    <p>Beispiel: Brutto 100,00 €, Steuersatz ${satzText('A')}.</p>
+    <p class="rechnung">Netto: 100,00 € : ${bruttoTeiler('A')} = <b>${fmtCents(netto)} €</b></p>
+    <p class="rechnung">MwSt.: 100,00 € − ${fmtCents(netto)} € = <b>${fmtCents(beispiel - netto)} €</b></p>
+    <p class="klein">Du darfst nicht ${satzText('A')} vom Brutto rechnen. Das Brutto ist schon mehr als 100 %.</p>
     <h3>5 · Rabatt, Pfand und Rückgeld</h3>
-    <p><b>Rabatt:</b> Ein Teil vom Preis fällt weg. Beispiel: 10 % von 20,00 € sind 2,00 €.</p>
+    <p><b>Rabatt:</b> Ein Teil vom Preis fällt weg.</p>
+    <p class="rechnung">Beispiel: 10 % von 20,00 € = <b>2,00 €</b></p>
     <p><b>Pfand:</b> Du bezahlst es für Flaschen und bekommst es bei der Rückgabe zurück.</p>
-    <p><b>Rückgeld:</b> gegeben − Summe. Beispiel: 10,00 € − 7,40 € = 2,60 €.</p>
+    <p><b>Rückgeld:</b> gegeben − Summe.</p>
+    <p class="rechnung">Beispiel: 10,00 € − 7,40 € = <b>2,60 €</b></p>
     <p class="klein">Vereinfachte Regeln für den Unterricht.</p>
   </section>`;
 }
