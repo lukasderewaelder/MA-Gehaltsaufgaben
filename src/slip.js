@@ -4,6 +4,9 @@ import { MONATE, POSTEN_TYPEN } from './model.js';
 
 export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
+/** Beiblatt: Stichwort links, Text rechts daneben; alle Zeilen darunter beginnen in derselben Spalte (hängender Einzug). */
+export const def = (stichwort, ...absaetze) => `<div class="def"><span class="def-k">${stichwort}</span><div class="def-t">${absaetze.join('')}</div></div>`;
+
 export const FELD_NAMEN = {
   gesamtBrutto: 'Gesamt-Brutto',
   stBrutto: 'Steuer-Brutto',

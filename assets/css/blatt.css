@@ -134,7 +134,11 @@
 .page-bei h3 { margin: 7px 0 1px; padding-bottom: 1px; font-size: 14px; color: var(--akzent); border-bottom: 1.5px solid var(--akzent); }
 .page-bei .page-kopf h1 { color: var(--akzent); }
 .page-bei .formel { margin: 1px 0; padding: 0; background: none; border: 0; font-weight: 700; font-size: 13px; color: var(--akzent); }
-.page-bei .rechnung { padding-left: 14px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.page-bei .def { display: grid; grid-template-columns: 8.2em 1fr; column-gap: 8px; align-items: baseline; break-inside: avoid; }
+.page-bei .def-k { font-weight: 700; color: var(--akzent); }
+.page-bei .def-t { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.page-bei .def-t p { margin: 0; }
+.page-bei .rechnung { padding-left: 0; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .page-bei .klein { font-size: 11px; color: #374151; }
 .page-bei p, .page-bei li, .page-bei tr, .page-bei .formel { break-inside: avoid; }
 .schritte { margin: 0; padding-left: 22px; }

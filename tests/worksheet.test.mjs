@@ -125,7 +125,7 @@ test('Beiblatt mit festem Steuersatz: Erklärungen, Rechenbeispiele, kleine Satz
   assert.match(arbeit, /2\.000 € · 9,3 % = <b>186,00 €<\/b>/, 'Beispiel mit dem echten Satz der Rentenversicherung');
   assert.match(arbeit, /Arzt und Krankenhaus/);
   assert.match(arbeit, /Obergrenze/);
-  assert.match(arbeit, /Kirchensteuer:<\/b> Nur wer in der Kirche ist/);
+  assert.match(arbeit, /def-k">Kirchensteuer<\/span>[^]*Nur wer in der Kirche ist/);
   // kleine Tabelle: 16 Brutto-Bänder, 6 Steuerklassen, Prozentwerte mit einer Nachkommastelle
   const tabelle = arbeit.slice(arbeit.indexOf('Steuersatz nach Brutto und Steuerklasse'));
   assert.equal((tabelle.match(/<tr><td>[\d.,]+ € bis unter [\d.,]+ €<\/td>/g) ?? []).length, 16);

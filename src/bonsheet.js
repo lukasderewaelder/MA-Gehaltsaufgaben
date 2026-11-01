@@ -2,7 +2,7 @@
 // TSE, Seriennummern und Prüfwerte fehlen bewusst: es ist ein Übungsbeleg.
 import { SAETZE, bonGesucht, bonSachtext, bonTeile, bruttoTeiler, rechneBon, satzText } from './calc/bon.js';
 import { bpOf, fmtBp, fmtCents, mul } from './calc/money.js';
-import { esc } from './slip.js';
+import { def, esc } from './slip.js';
 
 const linien = (n) => Array.from({ length: n }, () => '<div class="rz"></div>').join('');
 
@@ -83,21 +83,15 @@ export function bonBeiblatt(bon) {
     <p>Hinter jedem Preis steht ein Buchstabe. Er sagt dir, welcher Satz gilt.</p>
     <h3>3 · Netto ist gegeben</h3>
     <p class="formel">MwSt. = Netto · Steuersatz</p>
-    <p>Beispiel: Netto 100,00 €, Steuersatz ${satzText('A')}.</p>
-    <p class="rechnung">MwSt.: 100,00 € · ${satzText('A')} = <b>${fmtCents(stNetto)} €</b></p>
-    <p class="rechnung">Brutto: 100,00 € + ${fmtCents(stNetto)} € = <b>${fmtCents(beispiel + stNetto)} €</b></p>
+    ${def('Beispiel', `<p>Netto 100,00 €, Steuersatz ${satzText('A')}</p>`, `<p class="rechnung">MwSt.: 100,00 € · ${satzText('A')} = <b>${fmtCents(stNetto)} €</b></p>`, `<p class="rechnung">Brutto: 100,00 € + ${fmtCents(stNetto)} € = <b>${fmtCents(beispiel + stNetto)} €</b></p>`)}
     <h3>4 · Brutto ist gegeben</h3>
     <p class="formel">Netto = Brutto : ${bruttoTeiler('A')} (bei ${satzText('A')}) oder Brutto : ${bruttoTeiler('B')} (bei ${satzText('B')})</p>
-    <p>Beispiel: Brutto 100,00 €, Steuersatz ${satzText('A')}.</p>
-    <p class="rechnung">Netto: 100,00 € : ${bruttoTeiler('A')} = <b>${fmtCents(netto)} €</b></p>
-    <p class="rechnung">MwSt.: 100,00 € − ${fmtCents(netto)} € = <b>${fmtCents(beispiel - netto)} €</b></p>
-    <p class="klein">Du darfst nicht ${satzText('A')} vom Brutto rechnen. Das Brutto ist schon mehr als 100 %.</p>
+    ${def('Beispiel', `<p>Brutto 100,00 €, Steuersatz ${satzText('A')}</p>`, `<p class="rechnung">Netto: 100,00 € : ${bruttoTeiler('A')} = <b>${fmtCents(netto)} €</b></p>`, `<p class="rechnung">MwSt.: 100,00 € − ${fmtCents(netto)} € = <b>${fmtCents(beispiel - netto)} €</b></p>`)}
+    ${def('Achtung', `<p>Rechne nicht ${satzText('A')} vom Brutto. Das Brutto ist schon mehr als 100 %.</p>`)}
     <h3>5 · Rabatt, Pfand und Rückgeld</h3>
-    <p><b>Rabatt:</b> Ein Teil vom Preis fällt weg.</p>
-    <p class="rechnung">Beispiel: 10 % von 20,00 € = <b>2,00 €</b></p>
-    <p><b>Pfand:</b> Du bezahlst es für Flaschen und bekommst es bei der Rückgabe zurück.</p>
-    <p><b>Rückgeld:</b> gegeben − Summe.</p>
-    <p class="rechnung">Beispiel: 10,00 € − 7,40 € = <b>2,60 €</b></p>
+    ${def('Rabatt', '<p>Ein Teil vom Preis fällt weg.</p>', '<p class="rechnung">Beispiel: 10 % von 20,00 € = <b>2,00 €</b></p>')}
+    ${def('Pfand', '<p>Du bezahlst es für Flaschen und bekommst es bei der Rückgabe zurück.</p>')}
+    ${def('Rückgeld', '<p>gegeben − Summe</p>', '<p class="rechnung">Beispiel: 10,00 € − 7,40 € = <b>2,60 €</b></p>')}
     <p class="klein">Vereinfachte Regeln für den Unterricht.</p>
   </section>`;
 }
