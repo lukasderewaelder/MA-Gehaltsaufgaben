@@ -9,8 +9,10 @@ import { useApp } from './helpers.mjs';
 
 const app = useApp();
 const wert = (page, id) => page.locator(`#slip-host .val[data-feld="${id}"]`).textContent();
-/** Klappt einen Bereich des Formulars auf (z. B. „Arbeitsblatt“), falls er zu ist. */
+const SCHRITT_VON_BEREICH = { Arbeitsblatt: 'aufgabe', 'Gesuchte Werte': 'aufgabe', Texte: 'aufgabe', Jahresübersicht: 'jahr', 'Aussehen und weitere Blöcke': 'aussehen' };
+/** Wählt den Schritt des Bereichs (oben) und klappt den Bereich (z. B. „Arbeitsblatt“) auf, falls er zu ist. */
 const bereich = async (page, name) => {
+  await page.click(`#ed-steps [data-schritt="${SCHRITT_VON_BEREICH[name] ?? 'zettel'}"]`);
   const details = page.locator('#editor-form details', { has: page.locator(`summary:text-is("${name}")`) });
   if (!(await details.evaluate((d) => d.open))) await details.locator('summary').click();
 };

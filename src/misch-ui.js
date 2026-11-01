@@ -142,7 +142,7 @@ export function createMischEditor(app) {
   let saving = Promise.resolve();
 
   const HINWEIS = {
-    arbeit: 'So sieht das Aufgabenblatt für die Klasse aus. Die Aufgaben stellst du links zusammen.',
+    arbeit: 'So sieht das Aufgabenblatt für die Klasse aus. Die Aufgaben stellst du rechts zusammen.',
     loesung: 'Grün hinterlegt sind die gesuchten Werte, darunter steht jeweils der Rechenweg.',
   };
 
@@ -156,7 +156,7 @@ export function createMischEditor(app) {
   }
   function fit() {
     const avail = $('#mi-preview').clientWidth - 24;
-    pages.style.zoom = String(Math.min(1, Math.max(0.3, avail / PAGE_W)));
+    pages.style.zoom = String(Math.min(1.3, Math.max(0.3, avail / PAGE_W)));
   }
   window.addEventListener('resize', () => blatt && fit());
 

@@ -1,4 +1,4 @@
-// Fall-Editor: Formular links, Live-Vorschau des Zettels rechts, Überschreiben einzelner Felder per Klick.
+// Fall-Editor: Live-Vorschau in der Mitte, Einstellungen des gewählten Schritts rechts, Überschreiben einzelner Felder per Klick.
 import { berechne, setzeSteuersatz } from './calc/payroll.js';
 import { fmtBp, fmtCents, parseScaled } from './calc/money.js';
 import { YEARS } from './calc/rates.js';
@@ -12,12 +12,13 @@ import { PAGE_W, fitPages, gesuchteFelder, sachtextAuto, teilText, teilaufgaben,
 import { renderSeiten } from './yearsheet.js';
 
 const SLIP_WIDTH = PAGE_W; // A4 bei 96 dpi
+const MAX_ZOOM = 1.3; // auf breiten Bildschirmen darf die Vorschau etwas größer werden
 
 const PANE_HINWEIS = {
   zettel: 'Auf einen Wert im Zettel tippen, um ihn von Hand zu ändern und den Rechenweg zu sehen.',
   arbeit: 'Auf einen Wert tippen: gesucht (bleibt leer) oder angegeben. Leere Linien sind die gesuchten Werte.',
   loesung: 'Grün hinterlegt sind die gesuchten Werte. Auf einen Wert tippen schaltet „gesucht“ um.',
-  'jahr-arbeit': 'Jahresübersicht als Aufgabe: Welche Teile Lücken sind, stellst du im Formular unter „Jahresübersicht“ ein.',
+  'jahr-arbeit': 'Jahresübersicht als Aufgabe: Welche Teile Lücken sind, stellst du rechts im Schritt „Jahr“ ein.',
   'jahr-loesung': 'Jahresübersicht mit Lösung: Grün hinterlegt sind die Werte, die im Aufgabenblatt fehlen.',
 };
 
@@ -105,16 +106,19 @@ function aufgabeForm(fall, r) {
       (t, i) => `<label class="f"><span>${esc(t.nr)} ${esc(feldName(t.id, fall))}</span><input data-action="teiltext" data-id="${esc(t.id)}" value="${esc(a.texte[t.id] ?? '')}" placeholder="${esc(teilText(fall, r, t.id, i))}"></label>`,
     )
     .join('');
-  return `<details><summary>Arbeitsblatt</summary>
+  return `<details open><summary>Arbeitsblatt</summary>
     ${rueckForm(fall, plan)}
     ${select('Blattart', 'aufgabe.blatt', [['aufgabe', 'Aufgabenblatt mit Zettel'], ['zettel', 'Nur der Zettel']], fall)}
     <div class="row">${input('Überschrift', 'aufgabe.titel', 'text', fall, `placeholder="${esc(fall.titel)}"`)}${select('Rechenzeilen', 'aufgabe.zeilen', [0, 1, 2, 3, 4, 5].map((n) => [n, n]), fall, 'int')}</div>
     ${check('Beiblatt „Abzüge im Überblick“ mitliefern', 'aufgabe.beiblatt', fall)}
-    <label class="f"><span>Einleitender Text</span><textarea id="sachtext" data-action="sachtext" rows="4">${esc(sach)}</textarea></label>
-    <button type="button" class="btn btn-small" data-action="sach-auto">Text automatisch erzeugen</button>
-    <h3 class="zw">Gesuchte Werte</h3>
+  </details>
+  <details open><summary>Gesuchte Werte</summary>
     <p class="muted">${plan ? 'Bei Rückwärtsaufgaben sind die Lücken fest vorgegeben.' : 'Diese Werte bleiben auf dem Arbeitsblatt leer. Man kann sie auch direkt im Arbeits- oder Lösungsblatt antippen.'}</p>
     ${plan ? '' : gruppen}
+  </details>
+  <details><summary>Texte</summary>
+    <label class="f"><span>Einleitender Text</span><textarea id="sachtext" data-action="sachtext" rows="4">${esc(sach)}</textarea></label>
+    <button type="button" class="btn btn-small" data-action="sach-auto">Text automatisch erzeugen</button>
     ${teile ? `<h3 class="zw">Texte der Teilaufgaben</h3><p class="muted">Leer lassen für den automatischen Text.</p>${teile}` : ''}
   </details>`;
 }
@@ -138,7 +142,7 @@ function satzAuswahl(fall, r) {
 
 function jahrForm(fall) {
   const jb = fall.jahresblatt;
-  return `<details><summary>Jahresübersicht</summary>
+  return `<details open><summary>Jahresübersicht</summary>
     ${input('Überschrift', 'jahresblatt.titel', 'text', fall, `placeholder="Jahresübersicht ${fall.jahr}"`)}
     <p class="muted">Diese Teile der Tabelle sind im Aufgabenblatt Lücken (Ansichten „Jahr: Aufgabe“ und „Jahr: Lösung“):</p>
     ${check('Jahressummen', 'jahresblatt.luecken.summen', fall)}
@@ -152,12 +156,12 @@ function jahrForm(fall) {
   </details>`;
 }
 
-function formHtml(fall, r) {
+/** Schritt „Zettel“: Kopfangaben, Firma und Person, Bezüge und Abzüge, Lohnsteuer. */
+function schrittZettel(fall, r) {
   const monate = MONATE.map((m, i) => [i + 1, m]);
   const jahre = YEARS.map((y) => [y, y]);
   return `
   <details open><summary>Zettel</summary>
-    ${input('Titel (nur in der Übersicht)', 'titel', 'text', fall)}
     <div class="row">${select('Art', 'art', [['gehalt', 'Gehalt'], ['lohn', 'Lohn']], fall)}${select('Monat', 'monat', monate, fall, 'int')}${select('Jahr', 'jahr', jahre, fall, 'int')}</div>
   </details>
   <details open><summary>Firma und Person</summary>
@@ -188,10 +192,13 @@ function formHtml(fall, r) {
     }
     ${fall.anzeige.einfach ? '' : check('Solidaritätszuschlag berechnen', 'steuer.soli', fall)}
     <p class="muted">Im Unterricht wird ein Monat betrachtet: Standard ist ein fester Steuersatz. Tabelle und Tarif sind vereinfacht und weichen von der amtlichen Lohnsteuer um wenige Euro ab.</p>
-  </details>
-  ${aufgabeForm(fall, r)}
-  ${jahrForm(fall)}
-  <details><summary>Aussehen und weitere Blöcke</summary>
+  </details>`;
+}
+
+/** Schritt „Aussehen“: Optik, Detailgrad, Erklärmodus und zuschaltbare Blöcke. */
+function schrittAussehen(fall) {
+  return `
+  <details open><summary>Aussehen und weitere Blöcke</summary>
     ${select('Optik', 'anzeige.optik', [['modern', 'Klar und modern'], ['original', 'Originalgetreu (Matrixdruck-Stil)']], fall)}
     ${check('Sehr einfach: ohne Obergrenzen, Steuer-Brutto, KV-/RV-/AV-/PV-Brutto und Soli (alles wird vom Brutto gerechnet)', 'anzeige.einfach', fall)}
     ${check('Erklärmodus: nummerierte Marken und Legende', 'anzeige.erklaermodus', fall)}
@@ -200,6 +207,14 @@ function formHtml(fall, r) {
     ${fall.anzeige.bloecke.bank ? input('Bank', 'bank.name', 'text', fall) + input('IBAN', 'bank.iban', 'text', fall) : ''}
   </details>`;
 }
+
+const SCHRITTE = {
+  zettel: { name: 'Zettel', html: schrittZettel, ansichten: ['zettel', 'arbeit', 'loesung'] }, // Zettel ändern und das Ergebnis im Blatt sehen
+  aufgabe: { name: 'Aufgabe', html: aufgabeForm, ansichten: ['arbeit', 'loesung'] },
+  jahr: { name: 'Jahr', html: jahrForm, ansichten: ['jahr-arbeit', 'jahr-loesung'] },
+  aussehen: { name: 'Aussehen', html: schrittAussehen, ansichten: ['zettel', 'arbeit', 'loesung'] },
+};
+const formHtml = (fall, r, schritt) => SCHRITTE[schritt].html(fall, r);
 
 export function createEditor(app) {
   const root = $('#view-editor');
@@ -213,6 +228,7 @@ export function createEditor(app) {
 
   const pagesHost = $('#pages-host');
   let pane = 'zettel';
+  let schritt = 'zettel';
 
   const result = () => berechne(fall);
 
@@ -232,7 +248,7 @@ export function createEditor(app) {
 
   function fitSlip() {
     const avail = $('#editor-preview').clientWidth - 24;
-    const scale = Math.min(1, Math.max(0.3, avail / SLIP_WIDTH));
+    const scale = Math.min(MAX_ZOOM, Math.max(0.3, avail / SLIP_WIDTH));
     slipHost.style.zoom = String(scale);
     pagesHost.style.zoom = String(scale);
   }
@@ -270,9 +286,37 @@ export function createEditor(app) {
     });
   });
 
+  // Schritte in der oberen Leiste: zeigen nur die Einstellungen des Schritts und springen zur passenden Ansicht
+  const stepTabs = [...document.querySelectorAll('#ed-steps [data-schritt]')];
+  function setSchritt(next, { ansicht = true } = {}) {
+    schritt = next;
+    for (const b of stepTabs) {
+      const aktiv = b.dataset.schritt === schritt;
+      b.setAttribute('aria-selected', String(aktiv));
+      b.tabIndex = aktiv ? 0 : -1;
+    }
+    formHost.setAttribute('aria-labelledby', `step-${schritt}`);
+    if (fall) renderForm();
+    const ansichten = SCHRITTE[schritt].ansichten;
+    if (ansicht && !ansichten.includes(pane)) setPane(ansichten[0]);
+  }
+  stepTabs.forEach((b) => {
+    b.id = `step-${b.dataset.schritt}`;
+    b.addEventListener('click', () => setSchritt(b.dataset.schritt));
+    b.addEventListener('keydown', (e) => {
+      const i = stepTabs.indexOf(b);
+      const ziel = { ArrowRight: stepTabs[(i + 1) % stepTabs.length], ArrowLeft: stepTabs[(i - 1 + stepTabs.length) % stepTabs.length], Home: stepTabs[0], End: stepTabs.at(-1) }[e.key];
+      if (!ziel) return;
+      e.preventDefault();
+      setSchritt(ziel.dataset.schritt);
+      ziel.focus();
+    });
+  });
+  formHost.setAttribute('role', 'tabpanel');
+
   function renderForm() {
     const open = new Map([...formHost.querySelectorAll('details')].map((d) => [d.querySelector('summary').textContent, d.open]));
-    formHost.innerHTML = formHtml(fall, result());
+    formHost.innerHTML = formHtml(fall, result(), schritt);
     formHost.querySelectorAll('details').forEach((d) => {
       const key = d.querySelector('summary').textContent;
       if (open.has(key)) d.open = open.get(key);
@@ -498,6 +542,19 @@ export function createEditor(app) {
   });
 
   // --- Kopfzeile ------------------------------------------------------------------------------------
+  const menu = $('#ed-menu');
+  menu.addEventListener('click', (e) => {
+    if (e.target.closest('.menu-liste button')) menu.open = false;
+  });
+  menu.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      menu.open = false;
+      menu.querySelector('summary').focus();
+    }
+  });
+  document.addEventListener('click', (e) => {
+    if (menu.open && !menu.contains(e.target)) menu.open = false;
+  });
   $('#ed-back').addEventListener('click', () => app.go('#/'));
   $('#ed-dup').addEventListener('click', () => app.duplicateFall(fall));
   $('#ed-print').addEventListener('click', () => window.print());
@@ -555,7 +612,7 @@ export function createEditor(app) {
       document.body.dataset.view = 'editor';
       $('#ed-titel').value = fall.titel;
       $('#ed-wuerfeln').hidden = !fall.zufall;
-      renderForm();
+      setSchritt('zettel', { ansicht: false });
       setPane('zettel');
       return true;
     },

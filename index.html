@@ -51,17 +51,28 @@
   <!-- Editor -->
   <div id="view-editor">
     <header class="edbar">
-      <button type="button" id="ed-back" class="btn">← Übersicht</button>
+      <button type="button" id="ed-back" class="btn" aria-label="Zurück zur Übersicht">← Übersicht</button>
       <input id="ed-titel" class="ed-titel" type="text" aria-label="Titel des Zettels" autocomplete="off">
+      <div id="ed-steps" class="steps" role="tablist" aria-label="Schritt">
+        <button type="button" role="tab" data-schritt="zettel" aria-selected="true">Zettel</button>
+        <button type="button" role="tab" data-schritt="aufgabe" aria-selected="false" tabindex="-1">Aufgabe</button>
+        <button type="button" role="tab" data-schritt="jahr" aria-selected="false" tabindex="-1">Jahr</button>
+        <button type="button" role="tab" data-schritt="aussehen" aria-selected="false" tabindex="-1">Aussehen</button>
+      </div>
       <span class="spacer"></span>
       <button type="button" id="ed-wuerfeln" class="btn" title="Gleiche Einstellungen, neuer Zufall" hidden>Neu würfeln</button>
-      <button type="button" id="ed-reset" class="btn" title="Alle von Hand geänderten Felder wieder automatisch rechnen">Felder zurücksetzen</button>
-      <button type="button" id="ed-dup" class="btn">Duplizieren</button>
       <button type="button" id="ed-present" class="btn">Vorführen</button>
-      <button type="button" id="ed-print" class="btn btn-primary">Drucken</button>
+      <button type="button" id="ed-pdf" class="btn btn-primary">PDF / Drucken …</button>
+      <details id="ed-menu" class="menu">
+        <summary class="btn" aria-label="Weitere Aktionen" title="Weitere Aktionen">⋯</summary>
+        <div class="menu-liste">
+          <button type="button" id="ed-dup" class="btn">Duplizieren</button>
+          <button type="button" id="ed-reset" class="btn" title="Alle von Hand geänderten Felder wieder automatisch rechnen">Felder zurücksetzen</button>
+          <button type="button" id="ed-print" class="btn">Drucken</button>
+        </div>
+      </details>
     </header>
     <div class="ed-body">
-      <aside id="editor-form" class="ed-form" aria-label="Eingaben"></aside>
       <section id="editor-preview" class="ed-preview" aria-label="Vorschau">
         <div class="pane-bar" role="tablist" aria-label="Ansicht">
           <button type="button" role="tab" data-pane="zettel" aria-selected="true">Zettel</button>
@@ -69,13 +80,12 @@
           <button type="button" role="tab" data-pane="loesung" aria-selected="false">Lösungsblatt</button>
           <button type="button" role="tab" data-pane="jahr-arbeit" aria-selected="false">Jahr: Aufgabe</button>
           <button type="button" role="tab" data-pane="jahr-loesung" aria-selected="false">Jahr: Lösung</button>
-          <span class="spacer"></span>
-          <button type="button" id="ed-pdf" class="btn btn-small">PDF erstellen …</button>
         </div>
         <p id="pane-hint" class="hint" aria-live="polite"></p>
         <div id="slip-host"></div>
         <div id="pages-host"></div>
       </section>
+      <aside id="editor-form" class="ed-form" aria-label="Einstellungen"></aside>
     </div>
   </div>
 
@@ -122,7 +132,6 @@
       <button type="button" id="mi-pdf" class="btn btn-primary">PDF erstellen …</button>
     </header>
     <div class="ed-body">
-      <aside id="mi-form" class="ed-form" aria-label="Eingaben"></aside>
       <section id="mi-preview" class="ed-preview" aria-label="Vorschau">
         <div class="pane-bar" role="tablist" aria-label="Ansicht">
           <button type="button" role="tab" id="mtab-arbeit" data-mpane="arbeit" aria-selected="true">Arbeitsblatt</button>
@@ -131,6 +140,7 @@
         <p id="mi-hint" class="hint" aria-live="polite"></p>
         <div id="mi-pages" role="tabpanel"></div>
       </section>
+      <aside id="mi-form" class="ed-form" aria-label="Einstellungen"></aside>
     </div>
   </div>
 
