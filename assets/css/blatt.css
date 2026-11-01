@@ -106,3 +106,10 @@
 #view-editor[data-pane='zettel'] #pages-host,
 #view-editor:not([data-pane='zettel']) #slip-host { display: none; }
 #pages-host .val[role='button'] { cursor: pointer; }
+
+/* Beiblatt „Was wird abgezogen?“ */
+.formel { background: #eef2ff; border-left: 4px solid #2563eb; padding: 3px 10px; font-weight: 700; margin: 2px 0; }
+.schritte { margin: 0; padding-left: 22px; }
+.page-bei { gap: 6px; font-size: 13px; line-height: 1.35; }
+.page-bei h3 { margin: 6px 0 0; }
+.page-bei .mz td, .page-bei .mz th { padding: 2px 7px; }

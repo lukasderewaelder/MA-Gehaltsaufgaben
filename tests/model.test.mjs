@@ -61,6 +61,7 @@ test('Szenario-Plausibilität: Minijob ohne Abzüge, Klasse III < I < V, Beitrag
     const f = SCENARIOS.find((s) => s.id === 'klasse3').build();
     f.person.steuerklasse = k;
     f.person.kinder = 0;
+    f.steuer.modus = 'formel'; // der feste Satz hängt nicht von der Klasse ab
     return berechne(f).lst;
   };
   assert.ok(klasse(3) < klasse(1) && klasse(1) < klasse(5));
@@ -69,10 +70,11 @@ test('Szenario-Plausibilität: Minijob ohne Abzüge, Klasse III < I < V, Beitrag
   assert.equal(gut.kvBrutto, gut.rates.bbgKv);
   assert.ok(gut.gesamtBrutto > gut.rvBrutto);
   // Weihnachtsgeld: Steuer deutlich höher als im Monat ohne Sonderzahlung
-  const w = by('weihnachtsgeld');
-  const ohne = SCENARIOS.find((s) => s.id === 'weihnachtsgeld').build();
+  const mit = SCENARIOS.find((s) => s.id === 'weihnachtsgeld').build();
+  mit.steuer.modus = 'formel'; // bei festem Satz verdoppelt sich die Steuer nur, mit dem Tarif steigt sie stärker
+  const ohne = structuredClone(mit);
   ohne.posten = ohne.posten.slice(0, 1);
-  assert.ok(w.lst > berechne(ohne).lst * 2);
+  assert.ok(berechne(mit).lst > berechne(ohne).lst * 2);
 });
 
 test('Speicher (Arbeitsspeicher-Variante): speichern, lesen, löschen, Einstellungen', async () => {

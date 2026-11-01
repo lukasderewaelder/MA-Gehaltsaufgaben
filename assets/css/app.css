@@ -193,3 +193,5 @@ dialog h3 { margin: 16px 0 8px; font-size: 1rem; color: var(--muted); }
   background: #111827; color: #fff; padding: 10px 14px; border-radius: 12px; display: flex; gap: 12px; align-items: center; z-index: 50; max-width: 92vw;
 }
 .toast .btn { background: transparent; color: #93c5fd; border-color: #374151; }
+
+.satz-vorschlag { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; }

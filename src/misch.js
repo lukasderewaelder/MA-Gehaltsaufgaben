@@ -36,7 +36,8 @@ export function normalizeMischSpec(raw) {
     anzahl: num(s.anzahl, 4, 1, MAX_AUFGABEN),
     typen: (Array.isArray(s.typen) ? s.typen : []).filter((t) => ALLE_TYPEN.includes(t)),
     art: oneOf(s.art, ['gehalt', 'lohn', 'gemischt'], 'gemischt'),
-    steuer: oneOf(s.steuer, ['prozent', 'tabelle', 'formel'], 'tabelle'),
+    steuer: oneOf(s.steuer, ['prozent', 'tabelle', 'formel'], 'prozent'),
+    einfach: bool(s.einfach, false),
     glatt: bool(s.glatt, false),
     kirche: bool(s.kirche, true),
     kinder: bool(s.kinder, true),
@@ -47,7 +48,7 @@ export function normalizeMischSpec(raw) {
 
 export function defaultMischSpec(stufe = 'mittel', seed = randomSeed()) {
   const d = defaultSpec(stufe, seed);
-  return normalizeMischSpec({ stufe, seed, anzahl: 4, typen: [], art: 'gemischt', steuer: d.steuer, glatt: d.glatt, kirche: d.kirche, kinder: d.kinder, klassen: d.klassen });
+  return normalizeMischSpec({ stufe, seed, anzahl: 4, typen: [], art: 'gemischt', steuer: d.steuer, einfach: d.einfach, glatt: d.glatt, kirche: d.kirche, kinder: d.kinder, klassen: d.klassen });
 }
 
 /** Bringt beliebige Daten in die Form eines gültigen Mischblatts (oder null). */
@@ -105,6 +106,7 @@ function fallSpec(typ, spec) {
     ...basis,
     art: spec.art,
     steuer: spec.steuer,
+    einfach: spec.einfach,
     glatt: spec.glatt,
     kirche: spec.kirche,
     kinder: spec.kinder,
@@ -118,7 +120,6 @@ function fallSpec(typ, spec) {
   };
   if (typ === 'stundenlohn') return { ...s, art: 'lohn', zuschlaege: true };
   if (typ === 'bezuege') return { ...s, zuschlaege: true };
-  if (typ === 'steuer' && spec.stufe === 'leicht') return { ...s, steuer: 'prozent' };
   return s;
 }
 

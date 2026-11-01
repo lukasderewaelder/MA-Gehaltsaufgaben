@@ -29,10 +29,22 @@ test('Zettel aus Szenario anlegen, ändern, speichern und nach dem Neuladen wied
   await page.fill('[data-bind="posten.0.faktor"]', '3000,00');
   assert.equal(await wert(page, 'gesamtBrutto'), '3.000,00');
   assert.notEqual(await wert(page, 'auszahlung'), alt);
+  // Standard ist ein fester Steuersatz: die Steuerklasse ändert die Steuer erst, wenn der Satz aus der Tabelle übernommen wird
+  assert.equal(await page.inputValue('[data-bind="steuer.modus"]'), 'prozent');
+  assert.match(await page.textContent('.satz-vorschlag'), /Vorschlag laut Tabelle/);
   await page.selectOption('[data-bind="person.steuerklasse"]', '3');
+  await page.click('[data-action="satz-tabelle"]');
   const kl3 = await wert(page, 'lst');
   await page.selectOption('[data-bind="person.steuerklasse"]', '5');
-  assert.notEqual(await wert(page, 'lst'), kl3, 'Steuerklasse wirkt auf die Lohnsteuer');
+  assert.equal(await wert(page, 'lst'), kl3, 'fester Satz: die Steuerklasse allein ändert nichts');
+  await page.click('[data-action="satz-tabelle"]');
+  assert.notEqual(await wert(page, 'lst'), kl3, 'neuer Satz aus der Tabelle für Steuerklasse V');
+  await page.selectOption('[data-bind="steuer.modus"]', 'tabelle');
+  const tabelle5 = await wert(page, 'lst');
+  await page.selectOption('[data-bind="person.steuerklasse"]', '3');
+  assert.notEqual(await wert(page, 'lst'), tabelle5, 'mit der Lohnsteuertabelle wirkt die Steuerklasse sofort');
+  await page.selectOption('[data-bind="person.steuerklasse"]', '5');
+  await page.selectOption('[data-bind="steuer.modus"]', 'prozent');
 
   await app.gespeichert(page);
   await page.reload(); // die Adresse zeigt weiter auf den Zettel: er wird aus dem Speicher geladen
@@ -141,7 +153,7 @@ test('Rückwärtsaufgaben: ohne Zettel (Netto und Quote) und mit Lücken im Zett
   await page.click('[data-pane="arbeit"]');
   await page.waitForSelector('#pages-host .page');
   assert.equal(await page.locator('#pages-host .slip').count(), 0, 'kein Zettel im Arbeitsblatt');
-  assert.match(await page.textContent('#pages-host .sachtext'), /Insgesamt werden .* % vom Brutto/);
+  assert.match(await page.textContent('#pages-host .sachtext'), /Zusammen gehen .* % vom Brutto/);
   await page.selectOption('[data-action="rueck-typ"]', 'beitrag');
   await page.waitForSelector('#pages-host .slip');
   assert.ok((await page.locator('#pages-host .val.luecke').count()) >= 6, 'alle Brutto-Werte sind Lücken');
@@ -379,6 +391,66 @@ test('Mischblatt: Zettel einsetzen, neu würfeln, Duplizieren, Sicherung mit Mis
   keineProbleme(b.problems, b.foreign);
   keineProbleme(a.problems, a.foreign);
   await b.context.close();
+});
+
+test('Sehr einfach: Felder entfallen, Beiblatt erklärt mit kleiner Satz-Tabelle, Zufall „leicht“ ist sehr einfach', async () => {
+  const { context, page, problems, foreign } = await app.openApp();
+  await app.neuerZettel(page, 'verkaeuferin');
+  const felder = () => page.locator('#slip-host [data-feld]').evaluateAll((e) => e.map((x) => x.dataset.feld));
+  let ids = await felder();
+  for (const id of ['stBrutto', 'kvBrutto', 'rvBrutto', 'avBrutto', 'pvBrutto']) assert.ok(ids.includes(id), `normal: ${id}`);
+  assert.ok(await page.locator('#slip-host thead th:text-is("St")').count());
+
+  await bereich(page, 'Aussehen und weitere Blöcke');
+  await page.check('[data-bind="anzeige.einfach"]');
+  ids = await felder();
+  for (const id of ['stBrutto', 'kvBrutto', 'rvBrutto', 'avBrutto', 'pvBrutto', 'soli']) assert.ok(!ids.includes(id), `einfach: ${id}`);
+  assert.equal(await page.locator('#slip-host thead th:text-is("St")').count(), 0);
+  assert.match(await page.textContent('#slip-host'), /Alles wird vom Gesamt-Brutto berechnet/);
+  const kv = await wert(page, 'kv');
+  assert.equal(kv, '231,88', '8,75 % von 2.650 €');
+  await page.uncheck('[data-bind="anzeige.einfach"]');
+  await page.check('[data-bind="anzeige.einfach"]');
+
+  // Arbeitsblatt: einfache Texte, Beiblatt mit Erklärungen und kleiner Tabelle, nichts läuft über
+  await page.click('[data-pane="arbeit"]');
+  await page.waitForSelector('#pages-host [data-seite="beiblatt"]');
+  const bei = page.locator('#pages-host [data-seite="beiblatt"]');
+  const text = await bei.textContent();
+  for (const abschnitt of ['1 · Brutto und Netto', '2 · Sozialabgaben', '3 · Steuern', '4 · So kommt das Netto heraus', 'Steuersatz nach Brutto und Steuerklasse']) assert.ok(text.includes(abschnitt), abschnitt);
+  assert.doesNotMatch(text, /Obergrenze|Solidarit/);
+  assert.equal(await bei.locator('.mz.lst tbody tr').count(), 8);
+  assert.equal(await page.locator('#pages-host .page.is-overflow').count(), 0);
+  const aufgaben = await page.locator('#pages-host .aufgabe, #pages-host .teil .tt').allTextContents();
+  assert.ok(aufgaben.length >= 5 && aufgaben.every((t) => !t.includes('KV-Brutto')));
+
+  // Steuersatz in der Tabelle ablesen: der Satz steht nicht mehr im Text
+  await bereich(page, 'Lohnsteuer');
+  await page.click('#pages-host .val[data-feld="lst"]'); // Lohnsteuer als gesucht markieren
+  const imText = await page.locator('#pages-host .teil .tt', { hasText: 'Lohnsteuer' }).first().textContent();
+  assert.match(imText, /Der Steuersatz ist \d+ %\. Rechne \d+ % vom Brutto\./);
+  await page.check('[data-bind="aufgabe.satzAblesen"]');
+  const ablesen = await page.locator('#pages-host .teil .tt', { hasText: 'Steuersatz' }).first().textContent();
+  assert.match(ablesen, /Tabelle auf dem Beiblatt/);
+  assert.doesNotMatch(ablesen, /ist \d+ %/, 'der Satz steht nicht im Text');
+  await page.click('[data-pane="zettel"]');
+
+  // Zufallsfall: Stufe „leicht“ schaltet „Sehr einfach“ automatisch ein, „mittel“ wieder aus
+  await page.click('#ed-back');
+  await page.click('#lib-zufall');
+  await page.waitForSelector('#dlg-zufall[open]');
+  await page.check('input[name="stufe"][value="leicht"]');
+  assert.ok(await page.locator('#dlg-zufall [data-k="einfach"]').isChecked());
+  assert.equal(await page.inputValue('#dlg-zufall [data-k="steuer"]'), 'prozent');
+  await page.check('input[name="stufe"][value="mittel"]');
+  assert.ok(!(await page.locator('#dlg-zufall [data-k="einfach"]').isChecked()));
+  await page.check('input[name="stufe"][value="leicht"]');
+  await page.click('#zufall-ok');
+  await page.waitForSelector('#slip-host .slip');
+  ids = await felder();
+  assert.ok(!ids.includes('kvBrutto') && ids.includes('kv'));
+  keineProbleme(problems, foreign);
+  await context.close();
 });
 
 test('Registerkarten sind mit der Tastatur bedienbar, Dialoge haben Namen', async () => {

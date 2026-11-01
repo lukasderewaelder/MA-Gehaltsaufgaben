@@ -86,6 +86,25 @@ export function tabellenLohnsteuer(bruttoCent, klasse, rates, stufe = 5000) {
 }
 
 /**
+ * Durchschnittlicher Steuersatz (Lohnsteuer : Brutto) für ein Monatsbrutto und eine Steuerklasse, auf ganze Prozent gerundet,
+ * in Basispunkten (14 % = 1400). Grundlage ist dieselbe vereinfachte Tabelle wie bei der Lohnsteuertabelle.
+ */
+export function effektiverSatz(bruttoCent, klasse, rates) {
+  if (bruttoCent <= 0) return 0;
+  const zeile = tabellenLohnsteuer(bruttoCent, klasse, rates);
+  return Math.round((zeile.lohnsteuer * 100) / zeile.mitte) * 100;
+}
+
+/** Brutto-Stufen (Cent) der kleinen Steuersatz-Tabelle auf dem Beiblatt. */
+export const SATZ_BRUTTO = [150000, 200000, 250000, 300000, 350000, 400000, 450000, 500000];
+
+/** Kleine Tabelle: für jedes Brutto die Steuersätze (Basispunkte) der Steuerklassen I bis VI. */
+export function satzTabelle(rates) {
+  const klassen = [1, 2, 3, 4, 5, 6];
+  return { klassen, zeilen: SATZ_BRUTTO.map((brutto) => ({ brutto, saetze: klassen.map((k) => effektiverSatz(brutto, k, rates)) })) };
+}
+
+/**
  * Steuerabzüge für einen Monat.
  *  stLaufend/stSonstig: steuerpflichtiges Brutto (laufend / sonstiger Bezug) in Cent
  *  vorsorgeMonat: Arbeitnehmeranteile der Sozialversicherung des Monats in Cent (Grundlage der Vorsorgepauschale)

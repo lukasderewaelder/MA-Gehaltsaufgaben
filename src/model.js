@@ -1,6 +1,9 @@
 // Datenmodell: Fall (= ein Lohn-/Gehaltszettel mit allem, was dazugehört), Posten und Voreinstellungen.
 // Beträge in Cent, Mengen in Hundertsteln (104 Std = 10400), Prozentsätze in Basispunkten (25 % = 2500).
 
+import { ratesFor } from './calc/rates.js';
+import { effektiverSatz } from './calc/tax.js';
+
 export const SCHEMA = 1;
 export const MONATE = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
 
@@ -22,8 +25,8 @@ export const POSTEN_TYPEN = {
 };
 
 export const STEUERMODI = {
+  prozent: 'Fester Steuersatz (Standard)',
   tabelle: 'Lohnsteuertabelle (Stufen von 50 €)',
-  prozent: 'Fester Prozentsatz',
   formel: 'Rechnerisch nach Steuertarif',
 };
 
@@ -87,9 +90,10 @@ export function newFall(overrides = {}) {
       minijob: false,
     },
     posten: [newPosten('gehalt', { faktor: 300000 })],
-    steuer: { modus: 'tabelle', prozent: 1500, soli: true },
+    // Im Unterricht gibt es nur einen Monat, das Gehalt liegt über dem Steuerfreibetrag: fester Steuersatz (aus der kleinen Tabelle), kein Soli
+    steuer: { modus: 'prozent', prozent: effektiverSatz(300000, 1, ratesFor(2026)), soli: false },
     ueberschreibungen: {},
-    anzeige: { optik: 'modern', bloecke: {}, erklaermodus: false },
+    anzeige: { optik: 'modern', bloecke: {}, erklaermodus: false, einfach: false },
     aufgabe: { gesucht: ['kv', 'rv', 'av', 'pv', 'netto'] },
     hinweis: '',
     fehltage: { urlaub: 0, krank: 0 },
@@ -115,6 +119,7 @@ function normalizeAufgabe(raw) {
     texte: Object.fromEntries(Object.entries(a.texte ?? {}).filter(([, v]) => typeof v === 'string' && v.trim())),
     zeilen: num(a.zeilen, 2, 0, 5),
     rueck: normalizeRueck(a.rueck),
+    satzAblesen: a.satzAblesen === true, // Steuersatz steht nicht im Text, die Schüler lesen ihn in der Tabelle ab
   };
 }
 
@@ -151,7 +156,8 @@ function normalizeZufall(raw) {
     strukturSeed: Number.isFinite(raw.strukturSeed) ? num(raw.strukturSeed, 1, 0, 4294967295) : null,
     art: oneOf(raw.art, ['gehalt', 'lohn', 'gemischt'], 'gemischt'),
     aufgabe: oneOf(raw.aufgabe, ['komplett', 'netto', 'sv', 'steuer', 'brutto'], 'komplett'),
-    steuer: oneOf(raw.steuer, ['prozent', 'tabelle', 'formel'], 'tabelle'),
+    steuer: oneOf(raw.steuer, ['prozent', 'tabelle', 'formel'], 'prozent'),
+    einfach: b(raw.einfach, false),
     glatt: b(raw.glatt, false),
     zuschlaege: b(raw.zuschlaege, false),
     sonderzahlung: b(raw.sonderzahlung, false),
@@ -225,6 +231,7 @@ export function normalizeFall(raw) {
       optik: oneOf(raw.anzeige?.optik, ['modern', 'original'], 'modern'),
       bloecke: Object.fromEntries(Object.keys(BLOECKE).map((k) => [k, Boolean(raw.anzeige?.bloecke?.[k])])),
       erklaermodus: Boolean(raw.anzeige?.erklaermodus),
+      einfach: Boolean(raw.anzeige?.einfach), // „Sehr einfach“: ohne Beitragsbemessungsgrenzen, Steuer-Brutto, SV-Brutto und Soli
     },
     aufgabe: normalizeAufgabe(raw.aufgabe),
     zufall: normalizeZufall(raw.zufall),

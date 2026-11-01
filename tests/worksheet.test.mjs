@@ -28,13 +28,14 @@ test('Teilaufgaben: Reihenfolge nach Zettel, Buchstaben, eigener Text überschre
 
 test('Teilaufgabentexte nennen Sätze und Steuerart', () => {
   const f = fall();
+  f.steuer.modus = 'tabelle';
   const r = berechne(f);
   assert.match(teilText(f, r, 'lst'), /Steuerklasse 1 in der Lohnsteuertabelle/);
   f.steuer = { ...f.steuer, modus: 'prozent', prozent: 1500 };
   assert.match(teilText(f, berechne(f), 'lst'), /15 % vom Steuer-Brutto/);
   assert.match(teilText(f, r, `p:${f.posten[0].id}`), /Betrag für „Gehalt“/);
   assert.match(sachtextAuto(f, true), /Lena Berger arbeitet bei Sport Sommer GmbH/);
-  assert.match(sachtextAuto(f, true), /Ergänze/);
+  assert.match(sachtextAuto(f, true), /Einige Werte fehlen\. Trage sie ein/);
 });
 
 test('Arbeitsblatt zeigt gesuchte Felder leer, Lösungsblatt mit Wert', () => {
@@ -82,7 +83,7 @@ test('Blattart „nur Zettel“ und Beiblatt', () => {
   f.aufgabe.beiblatt = true;
   html = renderBlatt(f, r, { modus: 'arbeit' });
   assert.equal((html.match(/class="page /g) ?? []).length, 2);
-  assert.match(html, /Abzüge im Überblick 2026/);
+  assert.match(html, /Was wird abgezogen\? 2026/);
   f.aufgabe.blatt = 'aufgabe';
   html = renderBlatt(f, r, { modus: 'arbeit' });
   assert.match(html, /class="teile/);
@@ -91,24 +92,51 @@ test('Blattart „nur Zettel“ und Beiblatt', () => {
   assert.ok(!renderBlatt(f, r, { modus: 'arbeit' }).includes('class="rz"'));
 });
 
-test('Beiblatt: Sätze der Person und Lohnsteuertabelle mit Treffer nur in der Lösung', () => {
+test('Beiblatt mit Lohnsteuertabelle: Sätze der Person, Treffer nur in der Lösung', () => {
   const f = fall();
+  f.steuer.modus = 'tabelle';
   const r = berechne(f);
   const arbeit = merkzettel(f, r, { modus: 'arbeit' });
   const loesung = merkzettel(f, r, { modus: 'loesung' });
-  assert.match(arbeit, /14,6 % \+ Zusatzbeitrag 2,9 % = 17,5 %/);
+  assert.match(arbeit, /Zusammen/);
+  assert.match(arbeit, /17,5 %/);
   assert.match(arbeit, /<b>8,75 %<\/b>/);
   assert.match(arbeit, /Lohnsteuertabelle/);
   assert.match(arbeit, /Klasse VI/);
   assert.ok(!arbeit.includes('treffer'));
-  assert.match(loesung, /class="r treffer"/);
-  // 13 Zeilen um das Brutto herum, die Zeile des Brutto ist dabei
-  assert.equal((arbeit.match(/<tr><td>[\d.,]+ bis [\d.,]+<\/td>/g) ?? []).length, 13);
+  assert.match(loesung, /class="r treffer/);
+  // 9 Zeilen um das Brutto herum, die Zeile des Brutto ist dabei
+  assert.equal((arbeit.match(/<tr><td>[\d.,]+ bis [\d.,]+<\/td>/g) ?? []).length, 9);
   assert.match(arbeit, new RegExp(`${fmtCents(r.steuerDetail.tabelle.von)} bis`));
-  // Der abzulesende Wert steht in der Tabelle
-  assert.ok(arbeit.includes(`>${fmtCents(r.lst)}<`));
-  f.steuer = { ...f.steuer, modus: 'prozent', prozent: 1500 };
-  assert.match(merkzettel(f, berechne(f)), /15 %<\/b> vom Steuer-Brutto/);
+  assert.ok(arbeit.includes(`>${fmtCents(r.lst)}<`), 'der abzulesende Wert steht in der Tabelle');
+});
+
+test('Beiblatt mit festem Steuersatz: Erklärungen, Rechenbeispiele, kleine Satz-Tabelle', () => {
+  const f = fall();
+  f.steuer.modus = 'prozent';
+  const r = berechne(f);
+  const arbeit = merkzettel(f, r, { modus: 'arbeit' });
+  const loesung = merkzettel(f, r, { modus: 'loesung' });
+  for (const abschnitt of ['1 · Brutto und Netto', '2 · Sozialabgaben', '3 · Steuern', '4 · So kommt das Netto heraus']) assert.ok(arbeit.includes(abschnitt), abschnitt);
+  assert.match(arbeit, /Netto = Brutto − Steuern − Sozialabgaben/);
+  assert.match(arbeit, /Lohnsteuer = Brutto · Steuersatz/);
+  assert.match(arbeit, /2\.000 € · 15 % = <b>300,00 €<\/b>/);
+  assert.match(arbeit, /2\.000 € · 9,3 % = <b>186,00 €<\/b>/, 'Beispiel mit dem echten Satz der Rentenversicherung');
+  assert.match(arbeit, /Arzt und Krankenhaus/);
+  assert.match(arbeit, /Obergrenze/);
+  assert.match(arbeit, /Kirchensteuer:<\/b> Nur wer in der Kirche ist/);
+  // kleine Tabelle: 8 Brutto-Zeilen, 6 Steuerklassen, Prozentwerte
+  const tabelle = arbeit.slice(arbeit.indexOf('Steuersatz nach Brutto und Steuerklasse'));
+  assert.equal((tabelle.match(/<tr><td>[\d.,]+ €<\/td>/g) ?? []).length, 8);
+  assert.equal((tabelle.match(/<th class="r">Klasse /g) ?? []).length, 6);
+  assert.match(tabelle, /<td class="r">\d+ %<\/td>/);
+  assert.ok(!arbeit.includes('treffer'));
+  assert.ok((loesung.match(/treffer/g) ?? []).length >= 7, 'Spalte der Steuerklasse und Zeile sind markiert');
+  // Sehr einfach: keine Obergrenze, kein Soli
+  f.anzeige.einfach = true;
+  const einfach = merkzettel(f, berechne(f), { modus: 'arbeit' });
+  assert.doesNotMatch(einfach, /Obergrenze|Solidarit|Soli\b/);
+  assert.match(einfach, /Prozentsatz vom Brutto<\/b>\. Der Chef zahlt die Hälfte/);
 });
 
 test('Verfügbare Felder hängen von den zugeschalteten Blöcken ab', () => {

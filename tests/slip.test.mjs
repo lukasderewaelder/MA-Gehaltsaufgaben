@@ -31,7 +31,7 @@ test('Erklärmodus im Zettel: Marken und Legende nur, wenn eingeschaltet', () =>
   const an = renderSlip(f, berechne(f));
   assert.equal(zaehle(an, /<span class="marke" aria-hidden="true">/g), 20); // 10 Marken im Zettel + 10 in der Legende
   assert.match(an, /class="legende"/);
-  assert.match(an, /Das Geld, das tatsächlich auf dem Konto ankommt/);
+  assert.match(an, /Das Geld, das wirklich auf dem Konto ankommt/);
   // ohne Legende (Vorführmodus zeigt sie am Rand)
   assert.equal(zaehle(renderSlip(f, berechne(f), { legende: false }), /<span class="marke"/g), 10);
 });

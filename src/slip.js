@@ -61,27 +61,46 @@ export function fmtWert(id, wert, fall) {
 
 const eur = fmtCents;
 
-/** Erklärmodus: Bereiche des Zettels mit Nummern und Text in Schülersprache (nur vorhandene Bereiche werden gezählt). */
+/**
+ * Erklärmodus: Bereiche des Zettels mit Nummern und kurzen Erklärungen in einfacher Sprache (nur vorhandene Bereiche werden gezählt).
+ * `nurNormal`: gibt es bei „Sehr einfach“ nicht; `einfach`: anderer Text bei „Sehr einfach“.
+ */
 const ERKLAERUNGEN = [
-  { id: 'kopf', titel: 'Wer und wofür?', text: 'Firma, Name, Personalnummer, Steuerklasse, Kinder, Konfession und Krankenkasse. Diese Angaben bestimmen, wie viel abgezogen wird.' },
-  { id: 'bezuege', titel: 'Die Bezüge', text: 'Alles, was verdient wurde, mit Menge und Faktor (z. B. Stunden mal Stundenlohn). Ein Prozentsatz zeigt einen Zuschlag.' },
-  { id: 'stsv', titel: 'St und SV', text: 'L = laufender Bezug, S = Sonderzahlung, F = frei. Nur bei L und S werden Steuern (St) und Sozialversicherung (SV) fällig.' },
-  { id: 'brutto', titel: 'Gesamt-Brutto', text: 'Die Summe aller Bezüge – das Geld, bevor etwas abgezogen wird.' },
-  { id: 'steuer', titel: 'Steuern', text: 'Lohnsteuer, Kirchensteuer und Solidaritätszuschlag werden vom Steuer-Brutto berechnet.' },
-  { id: 'sozial', titel: 'Sozialversicherung', text: 'Kranken-, Renten-, Arbeitslosen- und Pflegeversicherung: jeweils ein Prozentsatz vom Brutto – höchstens bis zur Beitragsbemessungsgrenze.' },
-  { id: 'steuerabzug', titel: 'Steuerrechtliche Abzüge', text: 'Lohnsteuer + Kirchensteuer + Solidaritätszuschlag.' },
-  { id: 'svabzug', titel: 'SV-rechtliche Abzüge', text: 'Die vier Sozialversicherungsbeiträge zusammen.' },
-  { id: 'netto', titel: 'Netto-Verdienst', text: 'Brutto minus alle Abzüge.' },
-  { id: 'verdienst', titel: 'Jahressummen', text: 'Alle Werte seit Januar zusammengezählt, z. B. für die Steuererklärung.', block: 'verdienst' },
-  { id: 'nettoabzug', titel: 'Abzüge vom Netto', text: 'Z. B. vermögenswirksame Leistungen: Sie werden erst nach den Steuern abgezogen.', block: 'netto' },
-  { id: 'arbeitgeber', titel: 'Arbeitgeberseite', text: 'Der Arbeitgeber zahlt zusätzlich seinen Anteil zur Sozialversicherung. Brutto plus dieser Anteil sind die Gesamtkosten.', block: 'arbeitgeber' },
-  { id: 'fehltage', titel: 'Fehltage und Hinweise', text: 'Urlaubs- und Krankheitstage sowie Anmerkungen zur Abrechnung.', block: 'fehltage' },
-  { id: 'auszahlung', titel: 'Auszahlungsbetrag', text: 'Das Geld, das tatsächlich auf dem Konto ankommt.' },
+  { id: 'kopf', titel: 'Wer ist das?', text: 'Hier stehen die Firma, der Name und wichtige Angaben: Steuerklasse, Kinder, Kirche und Krankenkasse. Davon hängt ab, wie viel abgezogen wird.' },
+  { id: 'bezuege', titel: 'Das Geld, das verdient wurde', text: 'Hier steht, wofür es Geld gibt. Oft gilt: Menge mal Faktor, zum Beispiel Stunden mal Stundenlohn. Ein Prozentsatz zeigt einen Zuschlag.' },
+  { id: 'stsv', titel: 'St und SV', nurNormal: true, text: 'L heißt: gilt jeden Monat. S heißt: einmalige Zahlung. F heißt: frei. Dann werden keine Steuern und Beiträge abgezogen.' },
+  { id: 'brutto', titel: 'Gesamt-Brutto', text: 'Alle Beträge zusammen. Das ist das Geld, bevor etwas abgezogen wird.' },
+  {
+    id: 'steuer',
+    titel: 'Steuern',
+    text: 'Lohnsteuer, Kirchensteuer und Soli rechnet man vom Steuer-Brutto aus.',
+    einfach: 'Lohnsteuer und Kirchensteuer rechnest du vom Brutto aus. Kirchensteuer zahlt nur, wer in der Kirche ist.',
+  },
+  {
+    id: 'sozial',
+    titel: 'Sozialversicherung',
+    text: 'Es gibt vier Versicherungen: Kranken-, Renten-, Arbeitslosen- und Pflegeversicherung. Jede kostet einen Prozentsatz vom Brutto. Bei sehr hohem Gehalt gibt es eine Obergrenze.',
+    einfach: 'Es gibt vier Versicherungen: Kranken-, Renten-, Arbeitslosen- und Pflegeversicherung. Jede kostet einen Prozentsatz vom Brutto.',
+  },
+  { id: 'steuerabzug', titel: 'Abzüge für Steuern', text: 'Lohnsteuer + Kirchensteuer + Soli.', einfach: 'Lohnsteuer + Kirchensteuer.' },
+  { id: 'svabzug', titel: 'Abzüge für die Sozialversicherung', text: 'Die vier Beiträge zusammen.' },
+  { id: 'netto', titel: 'Netto-Verdienst', text: 'Brutto minus alle Abzüge. Das bleibt übrig.' },
+  { id: 'verdienst', titel: 'Alles seit Januar', text: 'Hier sind alle Beträge seit Januar zusammengezählt.', block: 'verdienst' },
+  { id: 'nettoabzug', titel: 'Abzüge vom Netto', text: 'Zum Beispiel Geld, das gespart wird. Es wird erst zum Schluss abgezogen.', block: 'netto' },
+  { id: 'arbeitgeber', titel: 'Das zahlt der Chef', text: 'Der Chef zahlt zusätzlich seinen Teil der Sozialversicherung. Brutto plus sein Teil sind die Gesamtkosten.', block: 'arbeitgeber' },
+  { id: 'fehltage', titel: 'Fehltage und Hinweise', text: 'Urlaubstage, Krankheitstage und Anmerkungen.', block: 'fehltage' },
+  { id: 'auszahlung', titel: 'Auszahlungsbetrag', text: 'Das Geld, das wirklich auf dem Konto ankommt.' },
 ];
 
 /** Die Erklärungen mit fortlaufender Nummer (nur Bereiche, die der Zettel gerade zeigt). */
 export function erklaerungen(fall) {
-  return ERKLAERUNGEN.filter((e) => !e.block || fall.anzeige.bloecke[e.block]).map((e, i) => ({ ...e, nr: i + 1 }));
+  const einfach = fall.anzeige.einfach;
+  return ERKLAERUNGEN.filter((e) => (!e.block || fall.anzeige.bloecke[e.block]) && !(einfach && e.nurNormal)).map((e, i) => ({
+    id: e.id,
+    titel: e.titel,
+    text: einfach && e.einfach ? e.einfach : e.text,
+    nr: i + 1,
+  }));
 }
 
 /** Optionen: interactive (Felder anklickbar), compact (ohne Mindesthöhe, für das Arbeitsblatt),
@@ -131,6 +150,8 @@ export function renderSlip(
   const monat = `${MONATE[fall.monat - 1]} ${fall.jahr}`;
   const titel = fall.art === 'lohn' ? 'Lohnabrechnung' : 'Gehaltsabrechnung';
 
+  // „Sehr einfach“: keine Spalten St/SV, kein Steuer-Brutto, kein SV-Brutto, kein Soli – alles wird vom Gesamt-Brutto gerechnet
+  const einfach = Boolean(fall.anzeige.einfach);
   const zeilen = r.bruttoPosten
     .map((x) => {
       const art = POSTEN_TYPEN[x.typ]?.art ?? 'pauschal';
@@ -140,30 +161,44 @@ export function renderSlip(
       return `<tr>
         <td class="c">${esc(x.lohnart)}</td><td>${esc(x.bezeichnung)}</td><td class="c">${art === 'pauschal' ? '' : esc(x.einheit)}</td>
         <td class="r">${menge}</td><td class="r">${faktor}</td><td class="r">${prozent}</td>
-        <td class="c">${esc(x.st)}</td><td class="c">${esc(x.sv)}</td>
+        ${einfach ? '' : `<td class="c">${esc(x.st)}</td><td class="c">${esc(x.sv)}</td>`}
         <td class="r betrag">${val(`p:${x.id}`, x.betrag)}</td></tr>`;
     })
     .join('');
-  const leer = r.bruttoPosten.length ? '' : '<tr><td colspan="9" class="leer">Noch keine Bezüge.</td></tr>';
+  const spalten = einfach ? 7 : 9;
+  const leer = r.bruttoPosten.length ? '' : `<tr><td colspan="${spalten}" class="leer">Noch keine Bezüge.</td></tr>`;
 
   const svLabel = (kurz, bp) => `${kurz}-Beitrag <small>${fmtBp(bp)} %</small>`;
-  const steuerBlock = `
-    <div class="steuer-sv">
-      <div class="tabellen">
-        <table class="grid">
+  const steuerTabelle = einfach
+    ? `<table class="grid">
+          <tr><th>Lohnsteuer${marke('steuer')}</th><th>Kirchensteuer</th></tr>
+          <tr><td class="r">${val('lst', r.lst)}</td><td class="r">${val('kist', r.kist)}</td></tr>
+        </table>`
+    : `<table class="grid">
           <tr><th>Steuer-Brutto${marke('steuer')}</th><th>Lohnsteuer</th><th>Kirchensteuer</th><th>Solidaritätszuschlag</th></tr>
           <tr><td class="r">${val('stBrutto', r.stBrutto)}</td><td class="r">${val('lst', r.lst)}</td><td class="r">${val('kist', r.kist)}</td><td class="r">${val('soli', r.soli)}</td></tr>
-        </table>
-        <table class="grid">
+        </table>`;
+  const svTabelle = einfach
+    ? `<table class="grid">
+          <tr><th>${svLabel('KV', r.saetze.kv)}${marke('sozial')}</th><th>${svLabel('RV', r.saetze.rv)}</th><th>${svLabel('AV', r.saetze.av)}</th><th>${svLabel('PV', r.saetze.pv)}</th></tr>
+          <tr><td class="r">${val('kv', r.kv)}</td><td class="r">${val('rv', r.rv)}</td><td class="r">${val('av', r.av)}</td><td class="r">${val('pv', r.pv)}</td></tr>
+        </table>`
+    : `<table class="grid">
           <tr><th>KV-Brutto${marke('sozial')}</th><th>RV-Brutto</th><th>AV-Brutto</th><th>PV-Brutto</th></tr>
           <tr><td class="r">${val('kvBrutto', r.kvBrutto)}</td><td class="r">${val('rvBrutto', r.rvBrutto)}</td><td class="r">${val('avBrutto', r.avBrutto)}</td><td class="r">${val('pvBrutto', r.pvBrutto)}</td></tr>
           <tr class="kopf2"><th>${svLabel('KV', r.saetze.kv)}</th><th>${svLabel('RV', r.saetze.rv)}</th><th>${svLabel('AV', r.saetze.av)}</th><th>${svLabel('PV', r.saetze.pv)}</th></tr>
           <tr><td class="r">${val('kv', r.kv)}</td><td class="r">${val('rv', r.rv)}</td><td class="r">${val('av', r.av)}</td><td class="r">${val('pv', r.pv)}</td></tr>
-        </table>
+        </table>`;
+  const steuerBlock = `
+    <div class="steuer-sv">
+      <div class="tabellen">
+        ${steuerTabelle}
+        ${svTabelle}
+        ${einfach ? '<p class="klein einfach-hinweis">Alles wird vom Gesamt-Brutto berechnet.</p>' : ''}
       </div>
       <div class="summen">
-        <div class="sum"><span>Steuerrechtliche Abzüge${marke('steuerabzug')}</span>${val('steuerAbzuege', r.steuerAbzuege)}</div>
-        <div class="sum"><span>SV-rechtliche Abzüge${marke('svabzug')}</span>${val('svAbzuege', r.svAbzuege)}</div>
+        <div class="sum"><span>${einfach ? 'Abzüge für Steuern' : 'Steuerrechtliche Abzüge'}${marke('steuerabzug')}</span>${val('steuerAbzuege', r.steuerAbzuege)}</div>
+        <div class="sum"><span>${einfach ? 'Abzüge für die Sozialversicherung' : 'SV-rechtliche Abzüge'}${marke('svabzug')}</span>${val('svAbzuege', r.svAbzuege)}</div>
         <div class="sum sum-gross"><span>Netto-Verdienst${marke('netto')}</span>${val('netto', r.netto)}</div>
       </div>
     </div>`;
@@ -171,10 +206,17 @@ export function renderSlip(
   const k = r.kumuliert;
   const verdienst = bloecke.verdienst
     ? `<section class="block"><h3>Verdienstbescheinigung (seit Januar)${marke('verdienst')}</h3>
-        <table class="grid"><tr><th>Gesamt-Brutto</th><th>Steuer-Brutto</th><th>Lohnsteuer</th><th>Kirchensteuer</th><th>Solidaritätszuschlag</th></tr>
+        ${
+          einfach
+            ? `<table class="grid"><tr><th>Gesamt-Brutto</th><th>Lohnsteuer</th><th>Kirchensteuer</th></tr>
+        <tr><td class="r">${val('kumBrutto', k.brutto)}</td><td class="r">${val('kumLst', k.lst)}</td><td class="r">${val('kumKist', k.kist)}</td></tr></table>
+        <table class="grid"><tr><th>KV-Beitrag</th><th>RV-Beitrag</th><th>AV-Beitrag</th><th>PV-Beitrag</th></tr>
+        <tr><td class="r">${val('kumKv', k.kv)}</td><td class="r">${val('kumRv', k.rv)}</td><td class="r">${val('kumAv', k.av)}</td><td class="r">${val('kumPv', k.pv)}</td></tr></table>`
+            : `<table class="grid"><tr><th>Gesamt-Brutto</th><th>Steuer-Brutto</th><th>Lohnsteuer</th><th>Kirchensteuer</th><th>Solidaritätszuschlag</th></tr>
         <tr><td class="r">${val('kumBrutto', k.brutto)}</td><td class="r">${val('kumStBrutto', k.stBrutto)}</td><td class="r">${val('kumLst', k.lst)}</td><td class="r">${val('kumKist', k.kist)}</td><td class="r">${val('kumSoli', k.soli)}</td></tr></table>
         <table class="grid"><tr><th>SV-Brutto</th><th>KV-Beitrag</th><th>RV-Beitrag</th><th>AV-Beitrag</th><th>PV-Beitrag</th></tr>
-        <tr><td class="r">${val('kumSvBrutto', k.svBrutto)}</td><td class="r">${val('kumKv', k.kv)}</td><td class="r">${val('kumRv', k.rv)}</td><td class="r">${val('kumAv', k.av)}</td><td class="r">${val('kumPv', k.pv)}</td></tr></table>
+        <tr><td class="r">${val('kumSvBrutto', k.svBrutto)}</td><td class="r">${val('kumKv', k.kv)}</td><td class="r">${val('kumRv', k.rv)}</td><td class="r">${val('kumAv', k.av)}</td><td class="r">${val('kumPv', k.pv)}</td></tr></table>`
+        }
       </section>`
     : '';
 
@@ -224,9 +266,9 @@ export function renderSlip(
     ${zeige('bezuege') ? `<section class="block" data-abschnitt="bezuege">
       <h3>Brutto-Bezüge${marke('bezuege')}</h3>
       <table class="bezuege">
-        <thead><tr><th>Lohnart</th><th>Bezeichnung</th><th>Einheit</th><th>Menge</th><th>Faktor (€)</th><th>Prozent</th><th>St${marke('stsv')}</th><th>SV</th><th>Betrag (€)</th></tr></thead>
+        <thead><tr><th>Lohnart</th><th>Bezeichnung</th><th>Einheit</th><th>Menge</th><th>Faktor (€)</th><th>Prozent</th>${einfach ? '' : `<th>St${marke('stsv')}</th><th>SV</th>`}<th>Betrag (€)</th></tr></thead>
         <tbody>${zeilen}${leer}</tbody>
-        <tfoot><tr><td colspan="8" class="r"><strong>Gesamt-Brutto</strong>${marke('brutto')}</td><td class="r betrag">${val('gesamtBrutto', r.gesamtBrutto)}</td></tr></tfoot>
+        <tfoot><tr><td colspan="${spalten - 1}" class="r"><strong>Gesamt-Brutto</strong>${marke('brutto')}</td><td class="r betrag">${val('gesamtBrutto', r.gesamtBrutto)}</td></tr></tfoot>
       </table>
     </section>` : ''}
     ${zeige('steuer') ? `<section class="block" data-abschnitt="steuer"><h3>Steuer und Sozialversicherung</h3>${steuerBlock}</section>` : ''}

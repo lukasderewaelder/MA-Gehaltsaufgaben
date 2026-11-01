@@ -15,7 +15,7 @@ export const RUECK_TYPEN = {
 export const BEITRAEGE = { rv: 'Rentenversicherung', kv: 'Krankenversicherung', av: 'Arbeitslosenversicherung', pv: 'Pflegeversicherung' };
 export const STUNDEN_ARTEN = { stundenlohn: 'Stundenlohn gesucht', stunden: 'Stunden gesucht', zuschlag: 'Zuschlagssatz gesucht' };
 
-const bruttoIds = (r) => [
+const bruttoIds = (r, einfach = false) => einfach ? [...r.bruttoPosten.map((p) => `p:${p.id}`), 'gesamtBrutto'] : [
   ...r.bruttoPosten.map((p) => `p:${p.id}`),
   'gesamtBrutto', 'stBrutto', 'kvBrutto', 'rvBrutto', 'avBrutto', 'pvBrutto',
 ];
@@ -24,8 +24,10 @@ const bruttoIds = (r) => [
  * Plan einer Rückwärtsaufgabe oder null (keine gewählt / nicht möglich).
  * Ergebnis: { typ, gesucht (Lücken auf dem Zettel) | null, teile (feste Teilaufgaben) | null, sachtext, ohneZettel, versuche, fehler }
  */
-export function rueckPlan(fall, r, { kompakt = false } = {}) {
+export function rueckPlan(fall, r, { kompakt: kompaktWunsch = false } = {}) {
   const rueck = fall.aufgabe.rueck;
+  const einfach = Boolean(fall.anzeige.einfach); // „Sehr einfach“: es gibt nur ein Brutto
+  const kompakt = kompaktWunsch && !einfach;
   if (!rueck) return null;
   const p = fall.person;
   const monat = `${MONATE[fall.monat - 1]} ${fall.jahr}`;
@@ -43,12 +45,12 @@ export function rueckPlan(fall, r, { kompakt = false } = {}) {
     return {
       typ: 'beitrag',
       // kompakt (Mischblatt): nur der Ausschnitt „Steuer und Sozialversicherung“ ist zu sehen, dort fehlen die Berechnungsgrundlagen
-      gesucht: kompakt ? ['stBrutto', 'kvBrutto', 'rvBrutto', 'avBrutto', 'pvBrutto'] : bruttoIds(r),
-      sachtext: `${p.name} arbeitet bei ${fall.firma.name}. Auf der Abrechnung für ${monat} fehlen ${kompakt ? 'die Berechnungsgrundlagen' : 'alle Brutto-Werte'}. Der Beitrag zur ${name} ist aber bekannt. Ermittle die fehlenden Werte.`,
+      gesucht: kompakt ? ['stBrutto', 'kvBrutto', 'rvBrutto', 'avBrutto', 'pvBrutto'] : bruttoIds(r, einfach),
+      sachtext: `${p.name} arbeitet bei ${fall.firma.name}. Auf der Abrechnung für ${monat} fehlen ${kompakt ? 'die Beträge, aus denen die Beiträge berechnet werden' : 'alle Brutto-Werte'}. Der Beitrag zur ${name} ist bekannt. Ermittle die fehlenden Werte.`,
       teile: [
         {
           id: 'rueck',
-          text: `Der ${kurz}-Beitrag beträgt ${eur(beitrag)}. Das sind ${fmtBp(bp)} % vom ${kurz}-Brutto. Berechne das ${kurz}-Brutto (Beitrag : Prozentsatz).`,
+          text: `Der ${kurz}-Beitrag ist ${eur(beitrag)}. Das sind ${fmtBp(bp)} % vom ${einfach ? 'Brutto' : `${kurz}-Brutto`}. Berechne das ${einfach ? 'Brutto' : `${kurz}-Brutto`}. Rechne: Beitrag : Prozentsatz.`,
           anzeige: eur(basis),
           weg: `${eur(beitrag)} : ${fmtBp(bp)} % = ${eur(rechnen)}${rechnen !== basis ? ` (gerundet, auf dem Zettel: ${eur(basis)})` : ''}`,
         },
@@ -90,12 +92,12 @@ export function rueckPlan(fall, r, { kompakt = false } = {}) {
     return {
       typ: 'quote',
       gesucht: [],
-      sachtext: `${p.name} bekommt im ${monat} ${eur(r.netto)} netto. Insgesamt werden ${fmtBp(q)} % vom Brutto für Steuern und Sozialversicherung abgezogen. Ermittle das Brutto.`,
+      sachtext: `${p.name} bekommt im ${monat} ${eur(r.netto)} netto. Zusammen gehen ${fmtBp(q)} % vom Brutto für Steuern und Sozialabgaben ab. Ermittle das Brutto.`,
       teile: [
-        { id: 'rueck', text: 'Berechne den Anteil in Prozent, der vom Brutto übrig bleibt.', anzeige: `${fmtBp(bleibt)} %`, weg: `100 % − ${fmtBp(q)} % = ${fmtBp(bleibt)} %` },
+        { id: 'rueck', text: 'Berechne, wie viel Prozent vom Brutto übrig bleiben.', anzeige: `${fmtBp(bleibt)} %`, weg: `100 % − ${fmtBp(q)} % = ${fmtBp(bleibt)} %` },
         {
           id: 'rueck2',
-          text: 'Berechne das Brutto (Netto : Prozentsatz).',
+          text: 'Berechne das Brutto. Rechne: Netto : Prozentsatz.',
           anzeige: eur(brutto),
           weg: `${eur(r.netto)} : ${fmtBp(bleibt)} % = ${eur(brutto)} (auf dem Zettel: ${eur(r.gesamtBrutto)}, die Abweichung kommt vom gerundeten Prozentsatz)`,
         },
@@ -113,9 +115,9 @@ export function rueckPlan(fall, r, { kompakt = false } = {}) {
     return {
       typ: 'probieren',
       gesucht: [],
-      sachtext: `${p.name} (Steuerklasse ${p.steuerklasse}) möchte im ${monat} ${eur(ziel)} netto bekommen. Ermittle das nötige Brutto. Probiere verschiedene Brutto-Beträge aus und berechne jeweils das Netto (Beitragssätze und Lohnsteuertabelle stehen auf dem Beiblatt und bei der Aufgabe).`,
+      sachtext: `${p.name} (Steuerklasse ${p.steuerklasse}) möchte im ${monat} ${eur(ziel)} netto bekommen. Ermittle das Brutto, das dafür nötig ist. Probiere verschiedene Beträge aus und berechne jedes Mal das Netto. Die Sätze und die Tabelle stehen auf dem Beiblatt.`,
       teile: [
-        { id: 'rueck', text: 'Trage deine Versuche in die Tabelle ein (Brutto und das dazugehörige Netto).', anzeige: '', weg: '' },
+        { id: 'rueck', text: 'Trage deine Versuche in die Tabelle ein: Brutto und Netto.', anzeige: '', weg: '' },
         { id: 'rueck2', text: 'Ermittle das Brutto, das mindestens nötig ist (auf 10 € genau).', anzeige: eur(such.brutto), weg: `Bei ${eur(such.brutto)} brutto bleiben ${eur(such.netto)} netto.` },
       ],
       ohneZettel: true,

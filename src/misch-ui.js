@@ -52,12 +52,13 @@ export function createMischDialog(app) {
       </div>
       <div class="row">
         <label class="f"><span>Art</span><select data-k="art">${opt({ gemischt: 'Gehalt und Lohn gemischt', gehalt: 'Gehalt', lohn: 'Lohn' }, spec.art)}</select></label>
-        <label class="f"><span>Lohnsteuer</span><select data-k="steuer">${opt({ prozent: 'Fester Prozentsatz', tabelle: 'Lohnsteuertabelle', formel: 'Rechnerisch nach Tarif' }, spec.steuer)}</select></label>
+        <label class="f"><span>Lohnsteuer</span><select data-k="steuer">${opt({ prozent: 'Fester Steuersatz (Standard)', tabelle: 'Lohnsteuertabelle', formel: 'Rechnerisch nach Tarif' }, spec.steuer)}</select></label>
       </div>
       <div class="row">
         <label class="f"><span>Steuerklassen</span><select data-k="klassen">${opt({ I: 'Nur Steuerklasse I', alle: 'Alle Steuerklassen' }, spec.klassen)}</select></label>
       </div>
       <fieldset class="optionen"><legend>Einzeln einstellbar</legend>
+        <label><input type="checkbox" data-k="einfach"${spec.einfach ? ' checked' : ''}> Sehr einfach (ohne Obergrenzen, Steuer-Brutto, SV-Brutto und Soli)</label>
         <label><input type="checkbox" data-k="glatt"${spec.glatt ? ' checked' : ''}> Runde Zahlen</label>
         <label><input type="checkbox" data-k="kirche"${spec.kirche ? ' checked' : ''}> Kirchensteuer</label>
         <label><input type="checkbox" data-k="kinder"${spec.kinder ? ' checked' : ''}> Kinder</label>
@@ -90,7 +91,7 @@ export function createMischDialog(app) {
     const k = el.dataset.k;
     if (k === 'stufe') {
       const d = defaultSpec(el.value);
-      spec = { ...spec, stufe: el.value, steuer: d.steuer, glatt: d.glatt, kirche: d.kirche, kinder: d.kinder, klassen: d.klassen };
+      spec = { ...spec, stufe: el.value, steuer: d.steuer, einfach: d.einfach, glatt: d.glatt, kirche: d.kirche, kinder: d.kinder, klassen: d.klassen };
       render();
     } else if (k === 'gruppen') {
       gruppen = Number(el.value);

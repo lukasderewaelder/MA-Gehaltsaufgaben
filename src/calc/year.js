@@ -3,7 +3,7 @@
 import { newPosten } from '../model.js';
 import { quoteBp } from './inverse.js';
 import { mul } from './money.js';
-import { berechne } from './payroll.js';
+import { berechne, setzeSteuersatz } from './payroll.js';
 
 /** Spalten der Jahresübersicht: Schlüssel und Kopfzeile. */
 export const SPALTEN = [
@@ -43,6 +43,7 @@ export function klassenvergleich(fall) {
   return [1, 2, 3, 4, 5, 6].map((klasse) => {
     const kopie = structuredClone(fall);
     kopie.person.steuerklasse = klasse;
+    if (kopie.steuer.modus === 'prozent') setzeSteuersatz(kopie); // fester Satz: der Satz hängt von der Steuerklasse ab
     const s = jahresRechnung(kopie).summe;
     return { klasse, brutto: s.brutto, steuer: s.lst + s.soli + s.kist, sv: s.kv + s.rv + s.av + s.pv, netto: s.netto, summe: s };
   });
@@ -63,6 +64,10 @@ export function paarvergleich(fall, partnerBrutto) {
     b.person.name = 'Partner/in';
     b.posten = [newPosten('gehalt', { faktor: partnerBrutto })];
     b.ueberschreibungen = {};
+    if (fall.steuer.modus === 'prozent') {
+      setzeSteuersatz(a);
+      setzeSteuersatz(b);
+    }
     const sa = jahresRechnung(a).summe;
     const sb = jahresRechnung(b).summe;
     return {

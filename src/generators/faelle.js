@@ -1,16 +1,18 @@
 // Zufallsfälle: aus Stufe, Schaltern und Startwert (Seed) entsteht ein vollständiger Zettel mit Aufgabe.
 // Gleiche Einstellungen und gleicher Seed ergeben immer denselben Fall (für Gruppe A/B und Wiederholung).
-import { berechne } from '../calc/payroll.js';
+import { berechne, setzeSteuersatz } from '../calc/payroll.js';
 import { ratesFor } from '../calc/rates.js';
 import { MONATE, newFall, newPosten, normalizeFall } from '../model.js';
 import { makeRng, randomSeed } from './rng.js';
 
 export { randomSeed };
 
+// Im Unterricht wird immer nur ein Monat betrachtet: überall fester Steuersatz (aus der kleinen Tabelle).
+// „einfach“ = Detailgrad „Sehr einfach“ (nur bei Stufe leicht automatisch an).
 export const STUFEN = {
-  leicht: { glatt: true, steuer: 'prozent', zuschlaege: false, sonderzahlung: false, kirche: false, kinder: false, klassen: 'I', ueberBbg: false, minijob: false, aufgabe: 'netto' },
-  mittel: { glatt: false, steuer: 'tabelle', zuschlaege: false, sonderzahlung: false, kirche: true, kinder: true, klassen: 'I', ueberBbg: false, minijob: false, aufgabe: 'komplett' },
-  schwer: { glatt: false, steuer: 'tabelle', zuschlaege: true, sonderzahlung: true, kirche: true, kinder: true, klassen: 'alle', ueberBbg: false, minijob: false, aufgabe: 'komplett' },
+  leicht: { glatt: true, einfach: true, steuer: 'prozent', zuschlaege: false, sonderzahlung: false, kirche: false, kinder: false, klassen: 'I', ueberBbg: false, minijob: false, aufgabe: 'netto' },
+  mittel: { glatt: false, einfach: false, steuer: 'prozent', zuschlaege: false, sonderzahlung: false, kirche: true, kinder: true, klassen: 'I', ueberBbg: false, minijob: false, aufgabe: 'komplett' },
+  schwer: { glatt: false, einfach: false, steuer: 'prozent', zuschlaege: true, sonderzahlung: true, kirche: true, kinder: true, klassen: 'alle', ueberBbg: false, minijob: false, aufgabe: 'komplett' },
 };
 
 export const AUFGABEN = {
@@ -65,10 +67,11 @@ const gerundet = (rng, lo, hi, schritt) => rng.int(Math.ceil(lo / schritt), Math
 const euro = (x) => Math.round(x * 100);
 
 function gesuchtFuer(aufgabe, fall, r) {
+  const einfach = fall.anzeige.einfach; // „Sehr einfach“: es gibt kein Steuer-Brutto und keine Grenzen
   const brutto = r.bruttoPosten.map((p) => `p:${p.id}`);
-  const steuer = ['stBrutto', 'lst', ...(r.soli > 0 ? ['soli'] : []), ...(r.kist > 0 ? ['kist'] : []), 'steuerAbzuege'];
+  const steuer = [...(einfach ? [] : ['stBrutto']), 'lst', ...(r.soli > 0 ? ['soli'] : []), ...(r.kist > 0 ? ['kist'] : []), 'steuerAbzuege'];
   const sv = ['kv', 'rv', 'av', 'pv', 'svAbzuege'];
-  const bbg = r.gesamtBrutto > r.rvBrutto ? ['kvBrutto', 'rvBrutto'] : [];
+  const bbg = !einfach && r.gesamtBrutto > r.rvBrutto ? ['kvBrutto', 'rvBrutto'] : [];
   switch (aufgabe) {
     case 'netto':
       return ['steuerAbzuege', 'svAbzuege', 'netto'];
@@ -77,9 +80,9 @@ function gesuchtFuer(aufgabe, fall, r) {
     case 'steuer':
       return steuer;
     case 'brutto':
-      return [...brutto, 'gesamtBrutto', 'stBrutto'];
+      return [...brutto, 'gesamtBrutto', ...(einfach ? [] : ['stBrutto'])];
     default:
-      return ['gesamtBrutto', 'stBrutto', ...bbg, 'lst', ...(r.kist > 0 ? ['kist'] : []), 'kv', 'rv', 'av', 'pv', 'netto'];
+      return ['gesamtBrutto', ...(einfach ? [] : ['stBrutto']), ...bbg, 'lst', ...(r.kist > 0 ? ['kist'] : []), 'kv', 'rv', 'av', 'pv', 'netto'];
   }
 }
 
@@ -152,7 +155,8 @@ export function erzeugeFall(eingabe) {
 
   // Zuschläge
   if (spec.zuschlaege && !spec.minijob) {
-    const arten = beruf.zuschlaege.length ? beruf.zuschlaege : ['ueberstunden'];
+    // „Sehr einfach“ kennt keine steuerfreien Anteile: dann nur Überstunden
+    const arten = spec.einfach ? ['ueberstunden'] : beruf.zuschlaege.length ? beruf.zuschlaege : ['ueberstunden'];
     const erste = sr.pick(arten);
     const wahl = arten.length > 1 && sr.chance(0.6) ? [erste, sr.pick(arten.filter((a) => a !== erste))] : [erste];
     const stundenFuer = { nacht: [8, 24], sonntag: [8, 16], feiertag: [4, 8], ueberstunden: [4, 16] };
@@ -175,7 +179,6 @@ export function erzeugeFall(eingabe) {
     }
   }
 
-  const steuerProzent = rng.pick([12, 14, 15, 16, 18, 20]) * 100;
   const fall = newFall({
     titel: '',
     art: lohn ? 'lohn' : 'gehalt',
@@ -184,9 +187,11 @@ export function erzeugeFall(eingabe) {
     firma: { name: firma, strasse: `${rng.pick(STRASSEN)} ${rng.int(1, 40)}`, ort: person.ort },
     person,
     posten,
-    steuer: { modus: spec.steuer, prozent: steuerProzent, soli: true },
+    steuer: { modus: spec.steuer, prozent: 1000, soli: spec.steuer !== 'prozent' && !spec.einfach }, // Satz folgt unten aus der Tabelle
+    anzeige: { optik: 'modern', bloecke: {}, erklaermodus: false, einfach: Boolean(spec.einfach) },
     zufall: { ...spec, gruppe: spec.gruppe },
   });
+  setzeSteuersatz(fall);
   const buchstabe = spec.gruppe > 0 ? ` (Gruppe ${String.fromCharCode(64 + spec.gruppe)})` : '';
   fall.titel = `${beruf.name}, ${MONATE[fall.monat - 1]}${buchstabe}`;
   fall.aufgabe.titel = `${lohn ? 'Lohnabrechnung' : 'Gehaltsabrechnung'} nachrechnen${buchstabe}`;

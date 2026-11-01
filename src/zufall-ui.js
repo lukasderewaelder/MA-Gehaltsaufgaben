@@ -7,6 +7,7 @@ import { esc } from './slip.js';
 import { $ } from './ui.js';
 
 const SCHALTER = [
+  ['einfach', 'Sehr einfach (ohne Obergrenzen, Steuer-Brutto, SV-Brutto und Soli)'],
   ['glatt', 'Runde Zahlen'],
   ['zuschlaege', 'Zuschläge (Nacht, Sonntag, Überstunden …)'],
   ['sonderzahlung', 'Sonderzahlung (Weihnachts-/Urlaubsgeld)'],
@@ -41,7 +42,7 @@ export function createZufallDialog(app) {
       </div>
       <div class="row">
         <label class="f"><span>Art</span><select data-k="art">${options({ gemischt: 'Gehalt und Lohn gemischt', gehalt: 'Gehalt (Monatsgehalt)', lohn: 'Lohn (Stundenlohn)' }, spec.art)}</select></label>
-        <label class="f"><span>Lohnsteuer</span><select data-k="steuer">${options({ prozent: 'Fester Prozentsatz', tabelle: 'Lohnsteuertabelle', formel: 'Rechnerisch nach Tarif' }, spec.steuer)}</select></label>
+        <label class="f"><span>Lohnsteuer</span><select data-k="steuer">${options({ prozent: 'Fester Steuersatz (Standard)', tabelle: 'Lohnsteuertabelle', formel: 'Rechnerisch nach Tarif' }, spec.steuer)}</select></label>
       </div>
       <label class="f"><span>Steuerklassen</span><select data-k="klassen">${options({ I: 'Nur Steuerklasse I', alle: 'Alle Steuerklassen' }, spec.klassen)}</select></label>
       <fieldset class="optionen"><legend>Einzeln einstellbar</legend>

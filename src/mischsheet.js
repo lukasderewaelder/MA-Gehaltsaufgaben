@@ -19,8 +19,11 @@ export function renderAufgabe(aufgabe, nr, blatt, modus) {
   const teile = teilaufgaben(fall, r, plan);
   const sach = fall.aufgabe.sachtext ?? sachtextAuto(fall, teile.length > 0, plan);
   const ohneZettel = Boolean(plan?.ohneZettel) || typ.nur.length === 0;
-  const slip = ohneZettel ? '' : renderSlip(fall, r, { compact: true, modus, gesucht, erklaer: false, legende: false, nur: new Set(typ.nur) });
-  const tabelle = typ.tabelle && fall.steuer.modus !== 'formel' ? `<div class="aufgabe-tabelle">${lohnsteuerTabelle(fall, r, { modus, halbe: aufgabe.typ === 'probieren' ? 7 : 3 })}</div>` : '';
+  // „Sehr einfach“: Steuern und Beiträge werden vom Gesamt-Brutto gerechnet, deshalb ist die Bezüge-Tabelle immer dabei
+  const abschnitte = new Set(fall.anzeige.einfach ? ['bezuege', ...typ.nur] : typ.nur);
+  const slip = ohneZettel ? '' : renderSlip(fall, r, { compact: true, modus, gesucht, erklaer: false, legende: false, nur: abschnitte });
+  const tabelleHtml = typ.tabelle && fall.steuer.modus !== 'formel' ? lohnsteuerTabelle(fall, r, { modus, halbe: aufgabe.typ === 'probieren' ? 7 : 3 }) : '';
+  const tabelle = tabelleHtml ? `<div class="aufgabe-tabelle">${tabelleHtml}</div>` : '';
   const eintraege = teile
     .map((t) => {
       const unten =

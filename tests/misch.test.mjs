@@ -70,8 +70,8 @@ test('Jede Art in jeder Stufe: Aufgabe ist lösbar, hat Teilaufgaben im Operator
 });
 
 test('Ausschnitte: Arten zeigen nur die passenden Abschnitte, gesuchte Werte sind Lücken', () => {
-  const b = erzeugeMischblatt({ ...defaultMischSpec('mittel', 7), anzahl: 8, typen: ALLE_TYPEN });
-  const nach = Object.fromEntries(b.aufgaben.map((a) => [a.typ, renderAufgabe(a, 1, b, 'arbeit')]));
+  const b = erzeugeMischblatt({ ...defaultMischSpec('mittel', 7), anzahl: 8, typen: ALLE_TYPEN, steuer: 'tabelle' });
+  const nach =Object.fromEntries(b.aufgaben.map((a) => [a.typ, renderAufgabe(a, 1, b, 'arbeit')]));
   assert.match(nach.bezuege, /data-abschnitt="bezuege"/);
   assert.doesNotMatch(nach.bezuege, /data-abschnitt="steuer"/);
   assert.match(nach.sv, /data-abschnitt="steuer"/);
@@ -116,10 +116,10 @@ test('Blatt: Kopf, Einleitung, Aufgaben in Reihenfolge, Beiblatt allgemein ohne 
   assert.equal(zaehle(html, /class="aufgabe"/g), 4);
   assert.deepEqual([...html.matchAll(/Aufgabe (\d)</g)].map((m) => Number(m[1])), [1, 2, 3, 4]);
   assert.match(html, /Bearbeite alle Aufgaben/);
-  assert.match(html, /Abzüge im Überblick 2026/);
-  assert.match(html, /Die Lohnsteuertabellen stehen bei den Aufgaben/);
+  assert.match(html, /Was wird abgezogen\? 2026/);
+  assert.match(html, /Steuersatz nach Brutto und Steuerklasse/, 'bei festem Satz: kleine Satz-Tabelle auf dem Beiblatt');
   b.beiblatt = false;
-  assert.doesNotMatch(renderMisch(b, { modus: 'arbeit' }), /Abzüge im Überblick/);
+  assert.doesNotMatch(renderMisch(b, { modus: 'arbeit' }), /Was wird abgezogen/);
   assert.match(renderMisch(b, { modus: 'loesung' }), /stempel/);
   assert.equal(renderSeiten(b, { modus: 'arbeit' }), renderMisch(b, { modus: 'arbeit' }), 'renderSeiten kennt Mischblätter');
 });

@@ -1,7 +1,8 @@
 // Fall-Editor: Formular links, Live-Vorschau des Zettels rechts, Überschreiben einzelner Felder per Klick.
-import { berechne } from './calc/payroll.js';
+import { berechne, setzeSteuersatz } from './calc/payroll.js';
 import { fmtBp, fmtCents, parseScaled } from './calc/money.js';
 import { YEARS } from './calc/rates.js';
+import { effektiverSatz } from './calc/tax.js';
 import { BLOECKE, KONFESSIONEN, MONATE, POSTEN_TYPEN, STEUERMODI, newPosten, normalizeFall, pruneOverrides } from './model.js';
 import { erzeugeFall, randomSeed } from './generators/faelle.js';
 import { BEITRAEGE, RUECK_TYPEN, STUNDEN_ARTEN, rueckPlan } from './rueck.js';
@@ -162,14 +163,22 @@ function formHtml(fall, r) {
   </details>
   <details open><summary>Lohnsteuer</summary>
     ${select('So wird die Lohnsteuer bestimmt', 'steuer.modus', Object.entries(STEUERMODI), fall)}
-    ${fall.steuer.modus === 'prozent' ? input('Lohnsteuer (% vom Steuer-Brutto)', 'steuer.prozent', 'bp', fall) : ''}
-    ${check('Solidaritätszuschlag berechnen', 'steuer.soli', fall)}
-    <p class="muted">Die Tabelle und die Rechnung nach Tarif sind vereinfacht und weichen von der amtlichen Lohnsteuer um wenige Euro ab.</p>
+    ${
+      fall.steuer.modus === 'prozent'
+        ? `${input(fall.anzeige.einfach ? 'Steuersatz (% vom Brutto)' : 'Steuersatz (% vom Steuer-Brutto)', 'steuer.prozent', 'bp', fall)}
+    <div class="satz-vorschlag"><span class="muted">Vorschlag laut Tabelle (Steuerklasse ${fall.person.steuerklasse}, ${fmtCents(r.gesamtBrutto)} € brutto): <b>${fmtBp(effektiverSatz(r.gesamtBrutto, fall.person.steuerklasse, r.rates))} %</b></span>
+    <button type="button" class="btn btn-small" data-action="satz-tabelle">Satz aus Tabelle übernehmen</button></div>
+    ${check('Die Schüler lesen den Steuersatz in der Tabelle auf dem Beiblatt ab (er steht nicht im Aufgabentext)', 'aufgabe.satzAblesen', fall)}`
+        : ''
+    }
+    ${fall.anzeige.einfach ? '' : check('Solidaritätszuschlag berechnen', 'steuer.soli', fall)}
+    <p class="muted">Im Unterricht wird ein Monat betrachtet: Standard ist ein fester Steuersatz. Tabelle und Tarif sind vereinfacht und weichen von der amtlichen Lohnsteuer um wenige Euro ab.</p>
   </details>
   ${aufgabeForm(fall, r)}
   ${jahrForm(fall)}
   <details><summary>Aussehen und weitere Blöcke</summary>
     ${select('Optik', 'anzeige.optik', [['modern', 'Klar und modern'], ['original', 'Originalgetreu (Matrixdruck-Stil)']], fall)}
+    ${check('Sehr einfach: ohne Obergrenzen, Steuer-Brutto, KV-/RV-/AV-/PV-Brutto und Soli (alles wird vom Brutto gerechnet)', 'anzeige.einfach', fall)}
     ${check('Erklärmodus: nummerierte Marken und Legende', 'anzeige.erklaermodus', fall)}
     ${Object.entries(BLOECKE).map(([k, t]) => check(t, `anzeige.bloecke.${k}`, fall)).join('')}
     ${fall.anzeige.bloecke.fehltage ? `<div class="row">${input('Urlaubstage', 'fehltage.urlaub', 'int', fall)}${input('Krankheitstage', 'fehltage.krank', 'int', fall)}</div>${input('Hinweis', 'hinweis', 'text', fall)}` : ''}
@@ -367,7 +376,10 @@ export function createEditor(app) {
   formHost.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-action]');
     if (!btn || btn.tagName === 'SELECT') return;
-    if (btn.dataset.action === 'sach-auto') {
+    if (btn.dataset.action === 'satz-tabelle') {
+      setzeSteuersatz(fall);
+      changed({ form: true });
+    } else if (btn.dataset.action === 'sach-auto') {
       fall.aufgabe.sachtext = null;
       changed({ form: true });
     } else if (btn.dataset.action === 'add-posten') {

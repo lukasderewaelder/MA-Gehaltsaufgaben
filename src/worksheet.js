@@ -1,6 +1,6 @@
 // Arbeitsblatt und Lösungsblatt: Teilaufgaben aus den gesuchten Feldern, Beiblatt „Abzüge im Überblick“, Seitenaufbau (A4).
-import { fmtBp, fmtCents } from './calc/money.js';
-import { tabellenLohnsteuer, tabellenStufe } from './calc/tax.js';
+import { bpOf, fmtBp, fmtCents } from './calc/money.js';
+import { SATZ_BRUTTO, satzTabelle, tabellenLohnsteuer, tabellenStufe } from './calc/tax.js';
 import { MONATE, POSTEN_TYPEN } from './model.js';
 import { rueckPlan } from './rueck.js';
 import { esc, feldName, fmtWert, renderSlip } from './slip.js';
@@ -27,7 +27,10 @@ const REIHENFOLGE = [
 /** Felder, die auf dem Zettel zu sehen (und damit als „gesucht“ wählbar) sind, in Lese-Reihenfolge, nach Gruppen. */
 export function verfuegbareFelder(fall, r) {
   const b = fall.anzeige.bloecke;
+  // „Sehr einfach“: diese Felder gibt es auf dem Zettel nicht (Steuer-Brutto = Gesamt-Brutto, keine SV-Brutto, kein Soli)
+  const NUR_NORMAL = ['stBrutto', 'kvBrutto', 'rvBrutto', 'avBrutto', 'pvBrutto', 'soli', 'kumStBrutto', 'kumSvBrutto', 'kumSoli'];
   const sichtbar = (id) => {
+    if (fall.anzeige.einfach && NUR_NORMAL.includes(id)) return false;
     if (id === 'nettoAbzuege') return b.netto;
     if (id === 'agAnteil' || id === 'gesamtKosten') return b.arbeitgeber;
     if (id.startsWith('kum')) return b.verdienst;
@@ -57,60 +60,68 @@ export const OPERATOREN = {
 };
 const op = (art, i) => OPERATOREN[art][((i % 3) + 3) % 3];
 
-/** Automatischer Text einer Teilaufgabe in der Operator-Form („Berechne …“, „Ermittle …“, „Lies … ab“). `i` = Nummer der Teilaufgabe. */
+/**
+ * Automatischer Text einer Teilaufgabe in einfacher Sprache und in der Operator-Form („Berechne …“, „Ermittle …“, „Lies … ab“).
+ * Kurze Sätze; der Rechenweg steht als Hinweis dabei. `i` = Nummer der Teilaufgabe (für den Wechsel der Verben).
+ */
 export function teilText(fall, r, id, i = 0) {
+  const einfach = Boolean(fall.anzeige.einfach);
   const k = fall.person.steuerklasse;
   const s = r.saetze;
   const rechne = op('rechnen', i);
   const ermittle = op('ermitteln', i);
+  const brutto = (kurz) => (einfach ? 'Brutto' : `${kurz}-Brutto`);
   if (/^[mfz]:/.test(id)) {
     const p = r.posten.find((x) => x.id === id.slice(2));
     const n = p?.bezeichnung ?? 'Posten';
     const zuschlag = p && POSTEN_TYPEN[p.typ].art === 'zuschlag';
-    if (id[0] === 'f') return `${ermittle} den ${zuschlag ? 'Stundenlohn' : 'Faktor (z. B. Stundenlohn)'} in der Zeile „${n}“ (Betrag : Menge${zuschlag ? ' : Prozentsatz' : ''}).`;
-    if (id[0] === 'm') return `${ermittle} die Anzahl der ${p?.einheit === 'Std' ? 'Stunden' : 'Einheiten'} bei „${n}“ (Betrag : Faktor).`;
-    return `${ermittle} den Zuschlagssatz bei „${n}“ in Prozent (Betrag : (Menge · Stundenlohn)).`;
+    if (id[0] === 'f') return `${ermittle} den ${zuschlag ? 'Stundenlohn' : 'Faktor (zum Beispiel den Stundenlohn)'} bei „${n}“. Rechne: Betrag : Menge${zuschlag ? ' : Prozentsatz' : ''}.`;
+    if (id[0] === 'm') return `${ermittle} die Anzahl der ${p?.einheit === 'Std' ? 'Stunden' : 'Einheiten'} bei „${n}“. Rechne: Betrag : Faktor.`;
+    return `${ermittle} den Zuschlag bei „${n}“ in Prozent. Rechne: Betrag : (Menge · Stundenlohn).`;
   }
   if (id.startsWith('p:')) {
     const p = r.posten.find((x) => `p:${x.id}` === id);
     const art = POSTEN_TYPEN[p?.typ]?.art ?? 'pauschal';
     const n = p?.bezeichnung ?? 'Posten';
-    if (art === 'zuschlag') return `${rechne} den Betrag für „${n}“ (Menge · Stundenlohn · Prozentsatz).`;
-    if (art === 'menge') return `${rechne} den Betrag für „${n}“ (Menge · Faktor).`;
+    if (art === 'zuschlag') return `${rechne} den Betrag für „${n}“. Rechne: Menge · Stundenlohn · Prozentsatz.`;
+    if (art === 'menge') return `${rechne} den Betrag für „${n}“. Rechne: Menge · Faktor.`;
     return `${ermittle} den Betrag für „${n}“.`;
   }
+  const satz = fmtBp(fall.steuer.prozent);
   const lst =
     fall.steuer.modus === 'tabelle'
-      ? `Lies die Lohnsteuer für Steuerklasse ${k} in der Lohnsteuertabelle ab.`
+      ? `Lies die Lohnsteuer für Steuerklasse ${k} in der Lohnsteuertabelle ab. Suche die Zeile mit dem Brutto.`
       : fall.steuer.modus === 'prozent'
-        ? `${rechne} die Lohnsteuer (${fmtBp(fall.steuer.prozent)} % vom Steuer-Brutto).`
+        ? fall.aufgabe.satzAblesen
+          ? `${ermittle} den Steuersatz in der Tabelle auf dem Beiblatt (Steuerklasse ${k}, Zeile mit dem Brutto). Berechne damit die Lohnsteuer: ${einfach ? 'Brutto' : 'Steuer-Brutto'} · Steuersatz.`
+          : `${rechne} die Lohnsteuer. Der Steuersatz ist ${satz} %. Rechne ${satz} % vom ${einfach ? 'Brutto' : 'Steuer-Brutto'}.`
         : `${ermittle} die Lohnsteuer.`;
-  const grundlage = (name, kurz) => `${ermittle} die Berechnungsgrundlage der ${name} (${kurz}-Brutto). Beachte die Beitragsbemessungsgrenze.`;
-  const beitrag = (name, kurz, bp) => `${rechne} den Beitrag zur ${name} (${fmtBp(bp)} % vom ${kurz}-Brutto).`;
+  const grundlage = (name, kurz) => `${ermittle} das ${kurz}-Brutto. Von diesem Betrag wird der Beitrag zur ${name} berechnet. Bei hohem Gehalt gibt es eine Obergrenze.`;
+  const beitrag = (name, kurz, bp) => `${rechne} den Beitrag zur ${name}. Rechne ${fmtBp(bp)} % vom ${brutto(kurz)}.`;
   const texte = {
-    gesamtBrutto: `${rechne} das Gesamt-Brutto (Summe aller Bezüge).`,
-    stBrutto: `${ermittle} das Steuer-Brutto. Steuerfreie Bezüge (St = F) zählen nicht mit.`,
+    gesamtBrutto: `${rechne} das Gesamt-Brutto. Zähle alle Beträge zusammen.`,
+    stBrutto: `${ermittle} das Steuer-Brutto. Steuerfreie Beträge (St = F) zählst du nicht mit.`,
     kvBrutto: grundlage('Krankenversicherung', 'KV'),
     rvBrutto: grundlage('Rentenversicherung', 'RV'),
     avBrutto: grundlage('Arbeitslosenversicherung', 'AV'),
     pvBrutto: grundlage('Pflegeversicherung', 'PV'),
     lst,
-    soli: `${rechne} den Solidaritätszuschlag (5,5 % der Lohnsteuer, sofern die Freigrenze überschritten ist).`,
+    soli: `${rechne} den Solidaritätszuschlag. Er beträgt 5,5 % von der Lohnsteuer. Ist die Lohnsteuer klein, fällt er weg.`,
     kist:
       fall.person.konfession === 'keine'
-        ? `${ermittle} die Kirchensteuer. (Keine Konfession.)`
-        : `${rechne} die Kirchensteuer (${fmtBp(r.steuerDetail.kistBp)} % der Lohnsteuer).`,
+        ? `${ermittle} die Kirchensteuer. Hier gibt es keine Konfession, also fällt sie weg.`
+        : `${rechne} die Kirchensteuer. Sie beträgt ${fmtBp(r.steuerDetail.kistBp)} % von der Lohnsteuer.`,
     kv: beitrag('Krankenversicherung', 'KV', s.kv),
     rv: beitrag('Rentenversicherung', 'RV', s.rv),
     av: beitrag('Arbeitslosenversicherung', 'AV', s.av),
     pv: beitrag('Pflegeversicherung', 'PV', s.pv),
-    steuerAbzuege: `${rechne} die steuerrechtlichen Abzüge (Lohnsteuer + Solidaritätszuschlag + Kirchensteuer).`,
-    svAbzuege: `${rechne} die SV-rechtlichen Abzüge (Summe der vier Sozialversicherungsbeiträge).`,
-    netto: `${rechne} den Netto-Verdienst (Gesamt-Brutto minus alle Abzüge).`,
-    nettoAbzuege: `${rechne} die Abzüge vom Netto insgesamt.`,
-    auszahlung: `${rechne} den Auszahlungsbetrag.`,
-    agAnteil: `${rechne} den Arbeitgeberanteil zur Sozialversicherung.`,
-    gesamtKosten: `${rechne} die Gesamtkosten für den Arbeitgeber (Brutto plus Arbeitgeberanteil).`,
+    steuerAbzuege: `${rechne} die Abzüge für Steuern. Rechne: Lohnsteuer + ${einfach ? '' : 'Soli + '}Kirchensteuer.`,
+    svAbzuege: `${rechne} die Abzüge für die Sozialversicherung. Zähle die vier Beiträge zusammen.`,
+    netto: `${rechne} den Netto-Verdienst. Rechne: Brutto − alle Abzüge.`,
+    nettoAbzuege: `${rechne} die Abzüge vom Netto. Zähle sie zusammen.`,
+    auszahlung: `${rechne} den Auszahlungsbetrag. Das ist das Geld, das auf dem Konto ankommt.`,
+    agAnteil: `${rechne} den Teil des Chefs an der Sozialversicherung.`,
+    gesamtKosten: `${rechne}, was die Person den Betrieb insgesamt kostet. Rechne: Brutto + Teil des Chefs.`,
   };
   return texte[id] ?? `${ermittle} den Wert „${feldName(id, fall)}“.`;
 }
@@ -119,7 +130,7 @@ export function sachtextAuto(fall, hatGesucht, plan = null) {
   if (plan?.sachtext) return plan.sachtext;
   const p = fall.person;
   const kinder = p.kinder > 0 ? `${p.kinder} ${p.kinder === 1 ? 'Kind' : 'Kinder'}` : 'keine Kinder';
-  return `${p.name} arbeitet bei ${fall.firma.name}. Hier ist die Abrechnung für ${MONATE[fall.monat - 1]} ${fall.jahr} (Steuerklasse ${p.steuerklasse}, ${kinder}). ${hatGesucht ? 'Einige Werte fehlen. Ergänze sie.' : 'Lies die Abrechnung genau.'}`;
+  return `${p.name} arbeitet bei ${fall.firma.name}. Das ist die Abrechnung für ${MONATE[fall.monat - 1]} ${fall.jahr}. Steuerklasse ${p.steuerklasse}, ${kinder}. ${hatGesucht ? 'Einige Werte fehlen. Trage sie ein.' : 'Lies die Abrechnung genau.'}`;
 }
 
 /** Gesuchte Felder (nur die, die es auf dem Zettel gibt) in Lese-Reihenfolge. */
@@ -143,16 +154,43 @@ export function teilaufgaben(fall, r, plan = rueckPlan(fall, r)) {
   }));
 }
 
-// --- Lohnsteuertabelle und Beiblatt „Abzüge im Überblick“ ---------------------------------------------
+// --- Lohnsteuertabelle, Steuersatz-Tabelle und Beiblatt „Abzüge im Überblick“ -------------------------
+const KLASSEN_NAME = ['I', 'II', 'III', 'IV', 'V', 'VI'];
+
+/**
+ * Kleine Tabelle: Steuersatz in Prozent nach Brutto (Zeilen) und Steuerklasse (Spalten).
+ * Im Lösungsblatt sind die Spalte der Steuerklasse und die Zeile, die zum Brutto am besten passt, markiert.
+ */
+export function satzTabelleHtml(fall, r, { modus = 'arbeit' } = {}) {
+  const t = satzTabelle(r.rates);
+  const k = fall.person.steuerklasse;
+  const naechste = SATZ_BRUTTO.reduce((a, b) => (Math.abs(b - r.gesamtBrutto) < Math.abs(a - r.gesamtBrutto) ? b : a));
+  const loesung = modus === 'loesung';
+  const kopf = t.klassen.map((c) => `<th class="r${loesung && c === k ? ' treffer' : ''}">Klasse ${KLASSEN_NAME[c - 1]}</th>`).join('');
+  const body = t.zeilen
+    .map((z) => {
+      const treffer = loesung && z.brutto === naechste;
+      const zellen = z.saetze
+        .map((bp, i) => `<td class="r${treffer ? ' treffer' : ''}${loesung && t.klassen[i] === k ? ' spalte' : ''}">${fmtBp(bp)} %</td>`)
+        .join('');
+      return `<tr><td>${fmtCents(z.brutto)} €</td>${zellen}</tr>`;
+    })
+    .join('');
+  return `<h3>Steuersatz nach Brutto und Steuerklasse</h3>
+      <table class="mz lst"><thead><tr><th>Brutto im Monat</th>${kopf}</tr></thead><tbody>${body}</tbody></table>
+      <p class="klein">So viel Prozent vom Brutto gehen als Lohnsteuer ab (gerundet). Je mehr Brutto, desto höher der Satz.</p>`;
+}
+
 /**
  * Ausschnitt der Lohnsteuertabelle (Monat) um die Zeile des Steuer-Brutto: `halbe` Zeilen darüber und darunter.
- * Im Lösungsblatt sind Zeile und Spalte der Steuerklasse markiert. Leer, wenn die Lohnsteuer nicht aus der Tabelle kommt.
+ * Im Lösungsblatt sind Zeile und Spalte der Steuerklasse markiert. Bei festem Steuersatz: die Satz-Tabelle,
+ * wenn die Schüler den Satz ablesen sollen, sonst nichts.
  */
 export function lohnsteuerTabelle(fall, r, { modus = 'arbeit', halbe = 6 } = {}) {
   const rates = r.rates;
   const k = fall.person.steuerklasse;
-  if (fall.steuer.modus === 'prozent') return `<h3>Lohnsteuer</h3><p>Die Lohnsteuer beträgt hier <b>${fmtBp(fall.steuer.prozent)} %</b> vom Steuer-Brutto.</p>`;
-  if (fall.steuer.modus !== 'tabelle') return '<h3>Lohnsteuer</h3><p>Die Lohnsteuer richtet sich nach dem Steuertarif, Steuerklasse und Kinderzahl. Sie wird in der Aufgabe angegeben.</p>';
+  if (fall.steuer.modus === 'prozent') return fall.aufgabe.satzAblesen ? satzTabelleHtml(fall, r, { modus }) : '';
+  if (fall.steuer.modus !== 'tabelle') return '<h3>Lohnsteuer</h3><p>Die Lohnsteuer hängt vom Gehalt, von der Steuerklasse und von den Kindern ab. Sie wird in der Aufgabe genannt.</p>';
   const mitte = r.steuerDetail.tabelle?.von ?? tabellenStufe(r.stBrutto).von;
   const stufe = 5000;
   // Beim „Probieren“ (gesucht ist das Brutto) steht die Zeile des Ergebnisses nicht in der Mitte: sonst verriete die Tabelle die Lösung
@@ -163,7 +201,7 @@ export function lohnsteuerTabelle(fall, r, { modus = 'arbeit', halbe = 6 } = {})
     if (von >= 0) reihen.push(von);
   }
   const klassen = [1, 2, 3, 4, 5, 6];
-  const kopf = klassen.map((c) => `<th class="r${modus === 'loesung' && c === k ? ' treffer' : ''}">Klasse ${['I', 'II', 'III', 'IV', 'V', 'VI'][c - 1]}</th>`).join('');
+  const kopf = klassen.map((c) => `<th class="r${modus === 'loesung' && c === k ? ' treffer' : ''}">Klasse ${KLASSEN_NAME[c - 1]}</th>`).join('');
   const body = reihen
     .map((von) => {
       const zeile = tabellenLohnsteuer(von, 1, rates, stufe);
@@ -175,38 +213,75 @@ export function lohnsteuerTabelle(fall, r, { modus = 'arbeit', halbe = 6 } = {})
     })
     .join('');
   return `<h3>Lohnsteuertabelle (Monat, Ausschnitt)</h3>
-      <table class="mz lst"><thead><tr><th>Steuer-Brutto</th>${kopf}</tr></thead><tbody>${body}</tbody></table>
-      <p class="klein">Beträge in Euro. Die Tabelle ist vereinfacht und berücksichtigt keine Kinderfreibeträge.</p>`;
+      <table class="mz lst"><thead><tr><th>Brutto</th>${kopf}</tr></thead><tbody>${body}</tbody></table>
+      <p class="klein">Beträge in Euro. Suche die Zeile mit dem Brutto und die Spalte mit der Steuerklasse.</p>`;
 }
 
+const WOFUER = {
+  kv: 'Arzt und Krankenhaus',
+  rv: 'Rente im Alter',
+  av: 'Geld bei Arbeitslosigkeit',
+  pv: 'Hilfe bei Pflege',
+};
+
 /**
- * Beiblatt mit Beitragssätzen, Beitragsbemessungsgrenzen, Soli und Kirchensteuer (und Lohnsteuertabelle).
+ * Beiblatt „Abzüge im Überblick“: erklärt in einfacher Sprache, was abgezogen wird, mit Rechenbeispielen.
  * allgemein: Sätze ohne persönliche Zu- und Abschläge (für Mischblätter mit mehreren Personen);
  * tabelle: false lässt die Lohnsteuertabelle weg (steht dann bei den Aufgaben).
+ * „Sehr einfach“ lässt Obergrenzen und Soli weg.
  */
 export function merkzettel(fall, r, { modus = 'arbeit', allgemein = false, tabelle = true } = {}) {
   const rates = r.rates;
-  const zusatz = fall.person.zusatzbeitrag;
+  const einfach = Boolean(fall.anzeige.einfach);
   const s = r.saetze;
+  const bsp = 200000; // Beispiel: 2.000 € Brutto
+  const von = (bp) => `${fmtCents(bp)} €`;
   const zeilen = [
-    ['Krankenversicherung (KV)', `${fmtBp(rates.kvAllgemein * 2)} % + Zusatzbeitrag ${fmtBp(zusatz)} % = ${fmtBp(rates.kvAllgemein * 2 + zusatz)} %`, `${fmtBp(s.kv)} %`],
-    ['Rentenversicherung (RV)', `${fmtBp(rates.rv * 2)} %`, `${fmtBp(s.rv)} %`],
-    ['Arbeitslosenversicherung (AV)', `${fmtBp(rates.av * 2)} %`, `${fmtBp(s.av)} %`],
-    ['Pflegeversicherung (PV)', `${fmtBp(rates.pv * 2)} %`, `${fmtBp(allgemein ? rates.pv : s.pv)} %`],
+    ['kv', 'Krankenversicherung (KV)', `${fmtBp(rates.kvAllgemein * 2 + fall.person.zusatzbeitrag)} %`, `${fmtBp(s.kv)} %`],
+    ['rv', 'Rentenversicherung (RV)', `${fmtBp(rates.rv * 2)} %`, `${fmtBp(s.rv)} %`],
+    ['av', 'Arbeitslosenversicherung (AV)', `${fmtBp(rates.av * 2)} %`, `${fmtBp(s.av)} %`],
+    ['pv', 'Pflegeversicherung (PV)', `${fmtBp(rates.pv * 2)} %`, `${fmtBp(allgemein ? rates.pv : s.pv)} %`],
   ];
-  const sv = zeilen.map(([n, ges, an]) => `<tr><td>${esc(n)}</td><td class="r">${esc(ges)}</td><td class="r"><b>${an}</b></td></tr>`).join('');
-  const steuer = tabelle ? lohnsteuerTabelle(fall, r, { modus }) : '<h3>Lohnsteuer</h3><p>Die Lohnsteuertabellen stehen bei den Aufgaben.</p>';
+  const sv = zeilen
+    .map(([k, n, ges, an]) => `<tr><td>${esc(n)}</td><td>${esc(WOFUER[k])}</td><td class="r">${esc(ges)}</td><td class="r"><b>${an}</b></td></tr>`)
+    .join('');
+
+  let steuer;
+  if (fall.steuer.modus === 'prozent') {
+    steuer = `<p>Die <b>Lohnsteuer</b> bekommt der Staat. In diesen Aufgaben rechnen wir mit einem <b>festen Steuersatz</b>.</p>
+      <p class="formel">Lohnsteuer = Brutto · Steuersatz</p>
+      <p><b>Beispiel:</b> Brutto 2.000 €, Steuersatz 15 %. Rechnung: 2.000 € · 15 % = <b>300,00 €</b>.</p>
+      ${satzTabelleHtml(fall, r, { modus })}`;
+  } else if (fall.steuer.modus === 'tabelle') {
+    steuer = `<p>Die <b>Lohnsteuer</b> bekommt der Staat. Wie viel es ist, hängt vom Brutto und von der Steuerklasse ab. Du liest sie in der Tabelle ab.</p>
+      ${tabelle ? lohnsteuerTabelle(fall, r, { modus, halbe: 4 }) : '<p>Die Lohnsteuertabellen stehen bei den Aufgaben.</p>'}`;
+  } else {
+    steuer = '<p>Die <b>Lohnsteuer</b> bekommt der Staat. Sie hängt vom Gehalt, von der Steuerklasse und von den Kindern ab. In der Aufgabe wird sie genannt.</p>';
+  }
+  const soli = !einfach && (fall.steuer.modus !== 'prozent' || fall.steuer.soli)
+    ? `<p><b>Soli</b> (Solidaritätszuschlag): ${fmtBp(rates.soliSatz)} % von der Lohnsteuer. Bei kleiner Lohnsteuer fällt er weg.</p>`
+    : '';
+  const kistBp = rates.kistSatz[fall.person.kirchensteuersatz];
+  const kistBeispiel = bpOf(30000, kistBp);
 
   return `<section class="page page-bei" data-seite="beiblatt">
-    <header class="page-kopf"><div><h1>Abzüge im Überblick ${rates.jahr}</h1>${modus === 'loesung' ? '<span class="stempel">Lösung</span>' : ''}</div></header>
-    <h3>Sozialversicherung</h3>
-    <table class="mz"><thead><tr><th>Versicherung</th><th class="r">Beitragssatz insgesamt</th><th class="r">Anteil Arbeitnehmer</th></tr></thead><tbody>${sv}</tbody></table>
-    <p class="klein">Arbeitgeber und Arbeitnehmer teilen sich die Beiträge. Pflegeversicherung: Kinderlose ab 23 Jahren zahlen ${fmtBp(rates.pvKinderlosZuschlag)} % mehr, ab dem 2. Kind gibt es ${fmtBp(rates.pvAbschlagProKind)} % Abschlag je Kind.</p>
-    <p><b>Beitragsbemessungsgrenze:</b> Rentenversicherung und Arbeitslosenversicherung ${eur(rates.bbgRv)} im Monat, Kranken- und Pflegeversicherung ${eur(rates.bbgKv)} im Monat. Nur bis zu dieser Grenze werden Beiträge berechnet.</p>
-    <h3>Steuern</h3>
-    <p><b>Solidaritätszuschlag:</b> ${fmtBp(rates.soliSatz)} % der Lohnsteuer – nur wenn die Lohnsteuer im Jahr über ${rates.soliFreigrenze.toLocaleString('de-DE')} € liegt (Steuerklasse III: ${(rates.soliFreigrenze * 2).toLocaleString('de-DE')} €).</p>
-    <p><b>Kirchensteuer:</b> ${fmtBp(rates.kistSatz[fall.person.kirchensteuersatz])} % der Lohnsteuer – nur bei Konfession (ev oder rk).</p>
+    <header class="page-kopf"><div><h1>Was wird abgezogen? ${rates.jahr}</h1>${modus === 'loesung' ? '<span class="stempel">Lösung</span>' : ''}</div></header>
+    <h3>1 · Brutto und Netto</h3>
+    <p><b>Brutto</b> ist das Geld, bevor etwas abgezogen wird. <b>Netto</b> bleibt übrig, wenn alle Abzüge weg sind.</p>
+    <p class="formel">Netto = Brutto − Steuern − Sozialabgaben</p>
+    <h3>2 · Sozialabgaben</h3>
+    <p>Mit den Sozialabgaben ist man gegen Krankheit, im Alter, bei Arbeitslosigkeit und bei Pflege abgesichert. Jede Abgabe ist ein <b>Prozentsatz vom ${einfach ? 'Brutto' : 'Brutto (KV-, RV-, AV- oder PV-Brutto)'}</b>. Der Chef zahlt die Hälfte. Du zahlst deinen Teil.</p>
+    <table class="mz"><thead><tr><th>Versicherung</th><th>Wofür?</th><th class="r">Zusammen</th><th class="r">Dein Teil</th></tr></thead><tbody>${sv}</tbody></table>
+    <p><b>Beispiel:</b> Brutto 2.000 €, Rentenversicherung ${fmtBp(rates.rv)} %. Rechnung: 2.000 € · ${fmtBp(rates.rv)} % = <b>${von(bpOf(bsp, rates.rv))}</b>. <span class="klein">(Tipp: ${fmtBp(rates.rv)} % = ${fmtBp(rates.rv)} : 100 = ${(rates.rv / 10000).toString().replace('.', ',')}.)</span></p>
+    <p class="klein">Pflegeversicherung: Wer keine Kinder hat und mindestens 23 Jahre alt ist, zahlt ${fmtBp(rates.pvKinderlosZuschlag)} % mehr. Ab dem 2. Kind gibt es ${fmtBp(rates.pvAbschlagProKind)} % weniger je Kind.</p>
+    ${einfach ? '' : `<p><b>Obergrenze:</b> Bei sehr hohem Gehalt wird nicht alles verrechnet. Für KV und PV zählen höchstens ${eur(rates.bbgKv)} im Monat, für RV und AV höchstens ${eur(rates.bbgRv)}.</p>`}
+    <h3>3 · Steuern</h3>
     ${steuer}
+    ${soli}
+    <p><b>Kirchensteuer:</b> Nur wer in der Kirche ist (ev oder rk), zahlt sie. Sie beträgt ${fmtBp(kistBp)} % von der Lohnsteuer. Beispiel: Lohnsteuer 300 € · ${fmtBp(kistBp)} % = <b>${von(kistBeispiel)}</b>.</p>
+    <p class="klein"><b>Steuerklassen:</b> I = ledig. II = alleinerziehend. III und V = verheiratet (einer zahlt weniger, der andere mehr). IV = verheiratet mit ähnlichem Verdienst. VI = zweite Arbeitsstelle.</p>
+    <h3>4 · So kommt das Netto heraus</h3>
+    <ol class="schritte"><li>Rechne das Brutto aus.</li><li>Ziehe die Steuern ab.</li><li>Ziehe die vier Sozialabgaben ab.</li><li>Das Ergebnis ist das Netto.</li></ol>
     <p class="klein">Vereinfachte Werte für den Unterricht (${rates.jahr}).</p>
   </section>`;
 }

@@ -95,3 +95,6 @@
 .slip.optik-original .kz { border-right-width: 0; }
 .slip.optik-original .sum-gross { background: #fff; border-bottom: 3px double var(--slip-ink); }
 .slip.optik-original .auszahlung { border-width: 0; border-top: 3px double var(--slip-ink); border-bottom: 3px double var(--slip-ink); }
+
+/* Sehr einfach: kurzer Hinweis unter den Tabellen */
+.slip .einfach-hinweis { margin: 4px 0 0; font-size: 11px; color: #4b5563; }

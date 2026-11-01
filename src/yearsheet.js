@@ -83,28 +83,28 @@ export function jahrTeilaufgaben(fall, j) {
   const teile = [];
   const sm = sonderMonat(fall);
   const bestes = (liste, key) => liste.reduce((a, b) => (b[key] > a[key] ? b : a));
-  if (l.netto) teile.push({ text: 'Berechne für jeden Monat das Netto (Brutto minus alle Abzüge).', loesung: `Netto im Jahr: ${eur(j.summe.netto)}` });
-  if (l.summen) teile.push({ text: 'Berechne die Jahressummen jeder Spalte.', loesung: `Jahresbrutto ${eur(j.summe.brutto)}, Jahresnetto ${eur(j.summe.netto)}` });
-  if (l.durchschnitt) teile.push({ text: 'Berechne den Durchschnitt je Monat (Jahressumme : 12).', loesung: `Netto im Durchschnitt: ${eur(j.durchschnitt.netto)} je Monat` });
+  if (l.netto) teile.push({ text: 'Berechne für jeden Monat das Netto. Rechne: Brutto − alle Abzüge.', loesung: `Netto im Jahr: ${eur(j.summe.netto)}` });
+  if (l.summen) teile.push({ text: 'Berechne die Summe jeder Spalte. Zähle die zwölf Monate zusammen.', loesung: `Jahresbrutto ${eur(j.summe.brutto)}, Jahresnetto ${eur(j.summe.netto)}` });
+  if (l.durchschnitt) teile.push({ text: 'Berechne den Durchschnitt für einen Monat. Rechne: Jahressumme : 12.', loesung: `Netto im Durchschnitt: ${eur(j.durchschnitt.netto)} je Monat` });
   if (l.quoten) {
     const sv = j.quoten.kv + j.quoten.rv + j.quoten.av + j.quoten.pv;
     const st = j.quoten.lst + j.quoten.soli + j.quoten.kist;
     teile.push({
-      text: 'Ermittle, wie viel Prozent vom Jahresbrutto netto übrig bleiben und wie viel an Steuern und an die Sozialversicherung gehen (auf 0,1 % genau).',
+      text: 'Berechne, wie viel Prozent vom Jahresbrutto netto übrig bleiben. Berechne auch den Anteil für Steuern und für die Sozialabgaben (auf 0,1 % genau).',
       loesung: `Netto ${fmtBp(j.quoten.netto)} %, Steuern ${fmtBp(st)} %, Sozialversicherung ${fmtBp(sv)} %`,
     });
   }
   if (sm) {
-    teile.push({ text: `Erkläre, warum Brutto und Abzüge im ${MONATE[sm - 1]} höher sind als in den anderen Monaten. Nutze das Diagramm.`, loesung: 'Es gibt eine Sonderzahlung; sie wird zusätzlich versteuert und verbeitragt (bis zur Beitragsbemessungsgrenze).' });
+    teile.push({ text: `Erkläre, warum im ${MONATE[sm - 1]} mehr Brutto und mehr Abzüge dastehen als in den anderen Monaten. Nutze das Diagramm.`, loesung: 'Es gibt eine einmalige Zahlung (zum Beispiel Weihnachtsgeld). Darauf zahlt man auch Steuern und Sozialabgaben.' });
   }
   if (fall.jahresblatt.vergleich === 'klassen') {
     const v = klassenvergleich(fall);
     const b = bestes(v, 'netto');
-    teile.push({ text: 'Vergleiche das Jahres-Netto in den Steuerklassen. Ermittle die günstigste Klasse für diese Person.', loesung: `Klasse ${KLASSEN_NAME[b.klasse - 1]}: ${eur(b.netto)} netto im Jahr` });
+    teile.push({ text: 'Vergleiche das Netto im Jahr für jede Steuerklasse. Ermittle die Klasse, bei der am meisten Netto übrig bleibt.', loesung: `Klasse ${KLASSEN_NAME[b.klasse - 1]}: ${eur(b.netto)} netto im Jahr` });
   } else if (fall.jahresblatt.vergleich === 'paar') {
     const v = paarvergleich(fall, fall.jahresblatt.partner);
     const b = bestes(v, 'netto');
-    teile.push({ text: 'Berechne für jede Kombination das gemeinsame Netto. Ermittle, welche Kombination im Jahr am wenigsten Steuern zahlt.', loesung: `Höchstes gemeinsames Netto: ${b.label} mit ${eur(b.netto)}` });
+    teile.push({ text: 'Berechne für jede Kombination das gemeinsame Netto. Ermittle die Kombination mit den wenigsten Steuern im Jahr.', loesung: `Höchstes gemeinsames Netto: ${b.label} mit ${eur(b.netto)}` });
   }
   return teile;
 }
@@ -118,7 +118,7 @@ export function renderJahr(fall, modus = 'arbeit') {
   const l = jb.luecken;
   const stempel = modus === 'loesung' ? '<span class="stempel">Lösung</span>' : '';
   const sm = sonderMonat(fall);
-  const sach = `${fall.person.name} arbeitet bei ${fall.firma.name}. Die Tabelle zeigt alle zwölf Monate des Jahres ${fall.jahr}${sm ? ` (mit Sonderzahlung im ${MONATE[sm - 1]})` : ''}. Ergänze die fehlenden Werte.`;
+  const sach = `${fall.person.name} arbeitet bei ${fall.firma.name}. Die Tabelle zeigt alle zwölf Monate im Jahr ${fall.jahr}${sm ? ` (im ${MONATE[sm - 1]} gibt es eine einmalige Zahlung)` : ''}. Trage die fehlenden Werte ein.`;
   const teile = jahrTeilaufgaben(fall, j)
     .map(
       (t, i) => `<div class="teil"><span class="tl">${String.fromCharCode(97 + (i % 26))})</span><div class="tb"><div class="tt">${esc(t.text)}</div>${

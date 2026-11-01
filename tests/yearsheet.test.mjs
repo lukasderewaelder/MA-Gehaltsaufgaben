@@ -20,7 +20,7 @@ test('Arbeitsblatt: Lücken in Summen, Durchschnitt und Anteilen, Lösung zeigt 
   assert.ok(!a.includes(`>${fmtCents(j.summe.netto)}<`), 'Summe darf im Arbeitsblatt nicht stehen');
   assert.match(a, /Jahresübersicht 2026/);
   assert.match(l, /stempel/);
-  assert.match(a, /mit Sonderzahlung im November/);
+  assert.match(a, /im November gibt es eine einmalige Zahlung/);
 });
 
 test('Netto-Spalte als Lücke: 12 Monate plus Summenzeilen, Diagramm entfällt im Arbeitsblatt', () => {
@@ -48,7 +48,7 @@ test('Teilaufgaben mit Lösung und Vergleich', () => {
   const j = jahresRechnung(f);
   const t = jahrTeilaufgaben(f, j);
   assert.ok(t.length >= 4);
-  assert.ok(t.some((x) => /Steuerklassen/.test(x.text) && /Klasse/.test(x.loesung)));
+  assert.ok(t.some((x) => /Steuerklasse/.test(x.text) && /Klasse/.test(x.loesung)));
   const a = renderJahr(f, 'arbeit');
   assert.match(a, /Steuerklassenvergleich/);
   assert.equal(zaehle(a, /class="vergleich"|class="jahrtab vergleich"/g), 1);

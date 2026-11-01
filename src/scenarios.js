@@ -1,4 +1,5 @@
 // Fertige Fälle als Startpunkt. Alle Firmen und Personen sind erfunden.
+import { setzeSteuersatz } from './calc/payroll.js';
 import { newFall, newPosten } from './model.js';
 
 const person = (extra) => ({
@@ -140,5 +141,11 @@ export const SCENARIOS = [
       }),
   },
 ];
+
+// Alle Szenarien starten mit festem Steuersatz; der Satz kommt aus der kleinen Steuersatz-Tabelle (Steuerklasse und Brutto)
+for (const s of SCENARIOS) {
+  const bauen = s.build;
+  s.build = () => setzeSteuersatz(bauen());
+}
 
 export const scenarioById = (id) => SCENARIOS.find((s) => s.id === id);

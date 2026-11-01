@@ -36,6 +36,7 @@ test('Jede Zeile geht auf: Brutto = Steuern + Sozialversicherung + Netto, ebenso
 
 test('Weihnachtsgeld gibt es nur im November und treibt die Steuer in dem Monat hoch', () => {
   const f = szenario('weihnachtsgeld');
+  f.steuer.modus = 'formel'; // nur der Tarif zeigt, dass die Sonderzahlung stärker besteuert wird
   assert.equal(f.monat, 11);
   const j = jahresRechnung(f);
   const normal = j.zeilen[0].werte;

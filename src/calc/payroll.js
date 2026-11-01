@@ -5,7 +5,7 @@ import { POSTEN_TYPEN } from '../model.js';
 import { bpOf, fmtBp, fmtCents, mul } from './money.js';
 import { ratesFor } from './rates.js';
 import { sozialversicherung } from './sv.js';
-import { soliJahr, steuerabzuege } from './tax.js';
+import { effektiverSatz, soliJahr, steuerabzuege } from './tax.js';
 
 const eur = (c) => `${fmtCents(c)} €`;
 const menge = (m) => fmtCents(m);
@@ -59,11 +59,14 @@ export function berechne(fall) {
   const summe = (list, pred) => list.filter(pred).reduce((s, p) => s + p.betrag, 0);
 
   const gesamtBrutto = feld('gesamtBrutto', summe(brutto, () => true), 'Summe aller Bezüge');
-  const stL = summe(brutto, (p) => p.st === 'L');
-  const stS = summe(brutto, (p) => p.st === 'S');
-  const svL = summe(brutto, (p) => p.sv === 'L');
-  const svS = summe(brutto, (p) => p.sv === 'S');
-  const stBrutto = feld('stBrutto', stL + stS, 'Bezüge, die versteuert werden müssen (ohne steuerfreie Anteile)');
+  // „Sehr einfach“: alles Brutto wird versteuert und verbeitragt, ohne Beitragsbemessungsgrenzen und ohne Soli
+  const einfach = Boolean(fall.anzeige?.einfach);
+  const stL = einfach ? gesamtBrutto : summe(brutto, (p) => p.st === 'L');
+  const stS = einfach ? 0 : summe(brutto, (p) => p.st === 'S');
+  const svL = einfach ? gesamtBrutto : summe(brutto, (p) => p.sv === 'L');
+  const svS = einfach ? 0 : summe(brutto, (p) => p.sv === 'S');
+  const rechenRates = einfach ? { ...rates, bbgRv: Infinity, bbgKv: Infinity } : rates;
+  const stBrutto = feld('stBrutto', stL + stS, einfach ? 'Das Brutto' : 'Bezüge, die versteuert werden müssen (ohne steuerfreie Anteile)');
   const stLaufend = Math.max(0, stBrutto - stS);
 
   // --- Sozialversicherung -----------------------------------------------------------------------
@@ -73,7 +76,7 @@ export function berechne(fall) {
     svEinmalig: pauschalMinijob ? 0 : svS,
     monat: fall.monat,
     person: fall.person,
-    rates,
+    rates: rechenRates,
   });
   const basisText = (id, wert, ohneGrenze) =>
     wert < ohneGrenze ? 'Bezüge, von denen Beiträge gezahlt werden' : 'Bezüge bis zur Beitragsbemessungsgrenze';
@@ -96,8 +99,8 @@ export function berechne(fall) {
     stSonstig: pauschalMinijob ? 0 : stS,
     vorsorgeMonat: kv + rv + pv, // Arbeitslosenversicherung zählt nicht zur Vorsorgepauschale
     person: fall.person,
-    steuer: fall.steuer,
-    rates,
+    steuer: einfach ? { ...fall.steuer, soli: false } : fall.steuer,
+    rates: rechenRates,
   });
   const lstText =
     st.modus === 'prozent'
@@ -108,7 +111,7 @@ export function berechne(fall) {
   const lst = feld('lst', st.lst, pauschalMinijob ? 'Minijob: pauschal vom Arbeitgeber' : lstText);
   // Wurde die Lohnsteuer von Hand geändert, rechnen Soli und Kirchensteuer mit diesem Wert weiter
   const lstVonHand = ov.lst !== undefined && !pauschalMinijob;
-  const soliAuto = lstVonHand ? (fall.steuer.soli === false ? 0 : mul(soliJahr(Math.round((lst * 12) / 100), fall.person.steuerklasse, rates), 1, 12)) : st.soli;
+  const soliAuto = lstVonHand ? (einfach || fall.steuer.soli === false ? 0 : mul(soliJahr(Math.round((lst * 12) / 100), fall.person.steuerklasse, rates), 1, 12)) : st.soli;
   const kistAuto = lstVonHand ? (fall.person.konfession === 'keine' ? 0 : bpOf(lst, st.kistBp)) : st.kist;
   const soli = feld('soli', soliAuto, soliAuto === 0 ? 'Unterhalb der Freigrenze fällt kein Solidaritätszuschlag an' : `${fmtBp(rates.soliSatz)} % der Lohnsteuer (bzw. Milderungszone)`);
   const kist = feld('kist', kistAuto, kistAuto === 0 ? 'Keine Kirchensteuer (keine Konfession)' : `${fmtBp(st.kistBp)} % der Lohnsteuer`);
@@ -178,6 +181,10 @@ export function berechne(fall) {
       }
     }
   }
+  if (einfach) {
+    // Es gibt nur ein Brutto: Steuern und Beiträge rechnen direkt damit
+    for (const id of ['lst', 'kv', 'rv', 'av', 'pv', 'agAnteil']) aus[id] = ['gesamtBrutto'];
+  }
   for (const [id, quellen] of Object.entries(aus)) if (weg[id]) weg[id].aus = quellen.filter((q) => weg[q]);
 
   return {
@@ -209,9 +216,17 @@ export function berechne(fall) {
     saetze: sv.saetze,
     steuerDetail: st,
     minijobPauschal: pauschalMinijob,
+    einfach,
     weg,
     werte,
   };
+}
+
+/** Setzt den festen Steuersatz des Zettels auf den Satz aus der kleinen Steuersatz-Tabelle (für Steuerklasse und Brutto). */
+export function setzeSteuersatz(fall) {
+  const r = berechne(fall);
+  fall.steuer.prozent = effektiverSatz(r.gesamtBrutto, fall.person.steuerklasse, r.rates);
+  return fall;
 }
 
 /** Prozent-Anteil eines Betrags am Brutto (z. B. Abgabenquote) in Basispunkten. */
