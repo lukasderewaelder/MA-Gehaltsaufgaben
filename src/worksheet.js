@@ -1,5 +1,5 @@
 // Arbeitsblatt und Lösungsblatt: Teilaufgaben aus den gesuchten Feldern, Beiblatt „Abzüge im Überblick“, Seitenaufbau (A4).
-import { bpOf, fmtBp, fmtCents } from './calc/money.js';
+import { bpOf, fmtBp, fmtCents, fmtSatz } from './calc/money.js';
 import { effektiverSatz, satzBand, satzTabelle, tabellenLohnsteuer, tabellenStufe } from './calc/tax.js';
 import { MONATE, POSTEN_TYPEN } from './model.js';
 import { rueckPlan } from './rueck.js';
@@ -87,7 +87,7 @@ export function teilText(fall, r, id, i = 0) {
     if (art === 'menge') return `${rechne} den Betrag für „${n}“. Rechne: Menge · Faktor.`;
     return `${ermittle} den Betrag für „${n}“.`;
   }
-  const satz = fmtBp(fall.steuer.prozent);
+  const satz = fmtSatz(fall.steuer.prozent);
   const lst =
     fall.steuer.modus === 'tabelle'
       ? `Lies die Lohnsteuer für Steuerklasse ${k} in der Lohnsteuertabelle ab. Suche die Zeile mit dem Brutto.`
@@ -171,7 +171,7 @@ export function satzTabelleHtml(fall, r, { modus = 'arbeit' } = {}) {
     .map((z) => {
       const treffer = loesung && z.von === band;
       const zellen = z.saetze
-        .map((bp, i) => `<td class="r${treffer ? ' treffer' : ''}${loesung && t.klassen[i] === k ? ' spalte' : ''}">${fmtBp(bp)} %</td>`)
+        .map((bp, i) => `<td class="r${treffer ? ' treffer' : ''}${loesung && t.klassen[i] === k ? ' spalte' : ''}">${fmtSatz(bp)} %</td>`)
         .join('');
       return `<tr><td>${fmtCents(z.von)} € bis unter ${fmtCents(z.bis)} €</td>${zellen}</tr>`;
     })
@@ -251,7 +251,7 @@ export function merkzettel(fall, r, { modus = 'arbeit', allgemein = false, tabel
   if (fall.steuer.modus === 'prozent') {
     steuer = `<p>Die <b>Lohnsteuer</b> bekommt der Staat. In diesen Aufgaben rechnen wir mit einem <b>festen Steuersatz</b>.</p>
       <p class="formel">Lohnsteuer = Brutto · Steuersatz</p>
-      <p><b>Beispiel:</b> Brutto 2.000 €, Steuersatz ${fmtBp(bspSatz)} %. Rechnung: 2.000 € · ${fmtBp(bspSatz)} % = <b>${von(bpOf(bsp, bspSatz))}</b>.</p>
+      <p><b>Beispiel:</b> Brutto 2.000 €, Steuersatz ${fmtSatz(bspSatz)} %. Rechnung: 2.000 € · ${fmtSatz(bspSatz)} % = <b>${von(bpOf(bsp, bspSatz))}</b>.</p>
       ${satzTabelleHtml(fall, r, { modus })}`;
   } else if (fall.steuer.modus === 'tabelle') {
     steuer = `<p>Die <b>Lohnsteuer</b> bekommt der Staat. Wie viel es ist, hängt vom Brutto und von der Steuerklasse ab. Du liest sie in der Tabelle ab.</p>

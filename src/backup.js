@@ -1,17 +1,19 @@
 // Sicherung und Austausch: alle Zettel als eine JSON-Datei (Export) und das Zusammenführen beim Import.
+import { normalizeBon } from './bon.js';
 import { normalizeMisch } from './misch.js';
 import { normalizeFall } from './model.js';
 
 export const BACKUP_FORMAT = 'lohnzettel-sicherung';
-export const BACKUP_VERSION = 2; // 2: zusätzlich Mischblätter (Dateien der Version 1 lassen sich weiter einlesen)
+export const BACKUP_VERSION = 3; // 2: zusätzlich Mischblätter, 3: zusätzlich Kassenzettel (ältere Dateien lassen sich weiter einlesen)
 
-export function buildBackup(faelle, blaetter = [], now = Date.now()) {
+export function buildBackup(faelle, blaetter = [], bons = [], now = Date.now()) {
   return {
     format: BACKUP_FORMAT,
     version: BACKUP_VERSION,
     exportedAt: now,
     faelle: faelle.map((f) => structuredClone(f)),
     blaetter: blaetter.map((b) => structuredClone(b)),
+    bons: bons.map((b) => structuredClone(b)),
   };
 }
 
@@ -20,7 +22,7 @@ export function backupFileName(date = new Date()) {
   return `Lohnzettel-Sicherung-${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())}.json`;
 }
 
-/** Liest Sicherungstext. Gibt { faelle, blaetter, ignoriert } zurück oder wirft einen Fehler mit verständlicher Meldung. */
+/** Liest Sicherungstext. Gibt { faelle, blaetter, bons, ignoriert } zurück oder wirft einen Fehler mit verständlicher Meldung. */
 export function parseBackup(text) {
   let data;
   try {
@@ -33,7 +35,9 @@ export function parseBackup(text) {
   const faelle = data.faelle.map((f) => normalizeFall(f)).filter(Boolean);
   const rohBlaetter = Array.isArray(data.blaetter) ? data.blaetter : [];
   const blaetter = rohBlaetter.map((b) => normalizeMisch(b)).filter(Boolean);
-  return { faelle, blaetter, ignoriert: data.faelle.length - faelle.length + rohBlaetter.length - blaetter.length };
+  const rohBons = Array.isArray(data.bons) ? data.bons : [];
+  const bons = rohBons.map((b) => normalizeBon(b)).filter(Boolean);
+  return { faelle, blaetter, bons, ignoriert: data.faelle.length - faelle.length + rohBlaetter.length - blaetter.length + rohBons.length - bons.length };
 }
 
 /** Neuere Fassung gewinnt; gleiche oder ältere Fassungen im Speicher bleiben. */

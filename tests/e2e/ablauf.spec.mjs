@@ -111,8 +111,10 @@ test('Arbeits- und Lösungsblatt, gesucht umschalten, PDF erstellen und herunter
   assert.match(download.suggestedFilename(), /\.pdf$/);
   const datei = join(await mkdtemp(join(tmpdir(), 'lohnzettel-')), 'blatt.pdf');
   await download.saveAs(datei);
-  const kopf = (await readFile(datei)).subarray(0, 5).toString();
-  assert.equal(kopf, '%PDF-');
+  const inhalt = await readFile(datei);
+  assert.equal(inhalt.subarray(0, 5).toString(), '%PDF-');
+  assert.ok(!inhalt.includes('/Subtype /Image'), 'echtes PDF mit Text, kein Bild');
+  assert.ok(inhalt.includes('/BaseFont /Helvetica'), 'Schrift ist eingebunden');
   keineProbleme(problems, foreign);
   await context.close();
 });
@@ -485,6 +487,58 @@ test('Schmaler Bildschirm (iPad hochkant): nichts läuft seitlich aus der Seite'
   await page.click('#ed-present');
   await page.waitForSelector('#pr-slip .slip');
   assert.ok((await breite()) <= 1, 'Vorführmodus ohne waagerechtes Scrollen');
+  keineProbleme(problems, foreign);
+  await context.close();
+});
+
+test('Kassenzettel: erzeugen, ändern, gesucht, Lösung, PDF, Wiederfinden', async () => {
+  const { context, page, problems, foreign } = await app.openApp();
+  await page.click('#lib-bon');
+  await page.waitForSelector('#dlg-bon[open]');
+  await page.check('input[name="bstufe"][value="schwer"]');
+  await page.selectOption('#dlg-bon [data-k="laden"]', 'supermarkt');
+  await page.click('#bon-ok');
+  await page.waitForSelector('#bon-pages .bon');
+  assert.match(await page.textContent('#bon-pages .bon'), /Pfand/);
+  assert.match(await page.textContent('#bon-pages .bon'), /Rabatt/);
+
+  // Preis ändern: Bon und Summe laufen mit
+  const alt = await page.textContent('#bon-pages .bon-summe');
+  await page.fill('[data-bind="zeilen.0.preis"]', '50,00');
+  await page.waitForFunction((a) => document.querySelector('#bon-pages .bon-summe').textContent !== a, alt);
+
+  // Arbeitsblatt: gesuchte Werte leer, Antippen schaltet um
+  await page.click('[data-bschritt="aufgabe"]');
+  await page.waitForSelector('#bon-pages .teil');
+  const luecken = await page.locator('#bon-pages .val.luecke').count();
+  assert.ok(luecken >= 3);
+  for (const t of await page.locator('#bon-pages .tt').allTextContents()) assert.match(t, /^(Berechne|Ermittle|Bestimme) /);
+  await page.locator('#bon-pages .val.luecke').first().click();
+  await page.waitForFunction((n) => document.querySelectorAll('#bon-pages .val.luecke').length === n - 1, luecken);
+  assert.equal(await page.locator('#bon-pages .page.is-overflow').count(), 0);
+
+  // Variante Einfach: nur das Wichtigste
+  await page.selectOption('[data-bind="variante"]', 'einfach');
+  await page.click('[data-bpane="zettel"]');
+  assert.doesNotMatch(await page.textContent('#bon-pages .bon'), /Rabatt|Pfand|Rückgeld/);
+
+  await page.click('[data-bpane="loesung"]');
+  assert.ok((await page.locator('#bon-pages .tloesung').count()) >= 2);
+  await page.click('#bon-pdf');
+  await page.click('#pdf-go');
+  await page.waitForFunction(() => document.querySelector('#pdf-status').textContent.startsWith('Fertig'), null, { timeout: 60_000 });
+  const [download] = await Promise.all([page.waitForEvent('download'), page.click('#pdf-download')]);
+  const datei = join(await mkdtemp(join(tmpdir(), 'lohnzettel-')), 'bon.pdf');
+  await download.saveAs(datei);
+  assert.ok(!(await readFile(datei)).includes('/Subtype /Image'));
+  await page.keyboard.press('Escape');
+
+  await app.gespeichert(page);
+  await page.reload();
+  await page.waitForSelector('#bon-pages .bon');
+  await page.click('#bon-back');
+  await page.waitForSelector('.card-bon');
+  assert.match(await page.textContent('.card-bon'), /Kassenzettel/);
   keineProbleme(problems, foreign);
   await context.close();
 });

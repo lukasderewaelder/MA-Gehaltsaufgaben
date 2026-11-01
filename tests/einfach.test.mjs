@@ -87,7 +87,7 @@ test('Verfügbare Felder, Teilaufgaben und Texte ohne die entfallenen Felder', (
   assert.equal(texte.length, 3, 'nur kv, rv und netto bleiben');
   assert.match(texte[0], /Rechne 8,75 % vom Brutto\./);
   assert.ok(texte.every((t) => !/KV-Brutto|Steuer-Brutto|Obergrenze/.test(t)));
-  assert.match(teilText(f, r, 'lst'), /Rechne 15 % vom Brutto\./);
+  assert.match(teilText(f, r, 'lst'), /Rechne 15,0 % vom Brutto\./);
   assert.match(teilText(f, r, 'steuerAbzuege'), /Lohnsteuer \+ Kirchensteuer\./);
 });
 

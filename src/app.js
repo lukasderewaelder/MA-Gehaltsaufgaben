@@ -1,5 +1,7 @@
 // App-Rahmen: Speicher, Routing (Bibliothek ↔ Editor), Sicherungsdialog.
 import { backupFileName, buildBackup, mergeFaelle, parseBackup } from './backup.js';
+import { duplicateBon } from './bon.js';
+import { createBonDialog, createBonEditor } from './bon-ui.js';
 import { createEditor } from './editor.js';
 import { createLibrary } from './library.js';
 import { createMischDialog, createMischEditor } from './misch-ui.js';
@@ -21,6 +23,11 @@ const currentMischId = () => {
   const m = location.hash.match(/^#\/misch\/(.+)$/);
   return m ? decodeURIComponent(m[1]) : null;
 };
+const bonPath = (id) => `#/bon/${encodeURIComponent(id)}`;
+const currentBonId = () => {
+  const m = location.hash.match(/^#\/bon\/(.+)$/);
+  return m ? decodeURIComponent(m[1]) : null;
+};
 const currentPresentId = () => {
   const m = location.hash.match(/^#\/vorfuehren\/(.+)$/);
   return m ? decodeURIComponent(m[1]) : null;
@@ -32,12 +39,12 @@ export async function startApp() {
   $('#storage-banner').hidden = store.persistent;
   navigator.storage?.persist?.().catch(() => {});
 
-  const app = { store, settings: await store.getSettings(), faelle: [], blaetter: [] };
+  const app = { store, settings: await store.getSettings(), faelle: [], blaetter: [], bons: [] };
   /** Lädt Zettel und Mischblätter neu aus dem Speicher. */
   app.refreshFaelle = async () => {
-    [app.faelle, app.blaetter] = await Promise.all([store.listFaelle(), store.listBlaetter()]);
+    [app.faelle, app.blaetter, app.bons] = await Promise.all([store.listFaelle(), store.listBlaetter(), store.listBons()]);
   };
-  app.anzahlGespeichert = () => app.faelle.length + app.blaetter.length;
+  app.anzahlGespeichert = () => app.faelle.length + app.blaetter.length + app.bons.length;
   app.setSettings = async (patch) => {
     Object.assign(app.settings, patch);
     await Promise.all(Object.entries(patch).map(([k, v]) => store.setSetting(k, v)));
@@ -52,16 +59,24 @@ export async function startApp() {
     app.noteChange();
   };
 
+  app.onBonSaved = (snapshot) => {
+    app.bons = [snapshot, ...app.bons.filter((b) => b.id !== snapshot.id)];
+    app.noteChange();
+  };
+
   // --- Navigation ---------------------------------------------------------------------------------
   let editor;
   let library;
   let present;
   let misch;
+  let bon;
   let routing = Promise.resolve();
   async function doRoute() {
     const presentId = currentPresentId();
     const mischId = currentMischId();
     const fallId = currentFallId();
+    const bonId = currentBonId();
+    if (!bonId) await bon.close();
     if (!presentId) await present.close();
     if (!mischId) await misch.close();
     if (!fallId) await editor.close();
@@ -77,7 +92,11 @@ export async function startApp() {
       document.title = `${editor.getFall().titel} – Lohnzettel-Werkstatt`;
       return;
     }
-    if (presentId || mischId || fallId) history.replaceState(null, '', '#/'); // unbekannte Adresse -> Übersicht
+    if (bonId && (await bon.open(bonId))) {
+      document.title = `${bon.getBon().titel} – Lohnzettel-Werkstatt`;
+      return;
+    }
+    if (presentId || mischId || fallId || bonId) history.replaceState(null, '', '#/'); // unbekannte Adresse -> Übersicht
     await library.show();
   }
   const route = () => {
@@ -176,8 +195,47 @@ export async function startApp() {
     });
   };
 
+  // --- Kassenzettel anlegen, kopieren, löschen ---------------------------------------------------------
+  app.createBons = async (bons) => {
+    for (const b of bons) await store.saveBon(b);
+    await app.refreshFaelle();
+    app.noteChange();
+    await app.go(bonPath(bons[0].id));
+    if (bons.length > 1) toast(`${bons.length} Kassenzettel angelegt (Gruppen A bis ${String.fromCharCode(64 + bons.length)}). Du findest sie in der Übersicht.`);
+  };
+  app.duplicateBon = async (b, { open = true } = {}) => {
+    await bon.flush();
+    const kopie = duplicateBon((await store.getBon(b.id)) ?? b);
+    await store.saveBon(kopie);
+    await app.refreshFaelle();
+    app.noteChange();
+    if (open) await app.go(bonPath(kopie.id));
+    else {
+      await library.show();
+      toast(`Kopie „${kopie.titel}“ angelegt.`);
+    }
+  };
+  app.deleteBon = async (b) => {
+    bon.discard(b.id);
+    const snapshot = (await store.getBon(b.id)) ?? structuredClone(b);
+    await store.deleteBon(b.id);
+    await app.refreshFaelle();
+    if (currentBonId()) await app.go('#/');
+    else await library.show();
+    toast(`„${b.titel}“ gelöscht.`, {
+      action: 'Rückgängig',
+      ms: 10_000,
+      onAction: async () => {
+        await store.saveBon(snapshot);
+        await app.refreshFaelle();
+        if (document.body.dataset.view === 'library') await library.show();
+      },
+    });
+  };
+
   // --- Sicherung ----------------------------------------------------------------------------------
   let deliverable = null;
+  const bestand = () => `${app.faelle.length} Zettel, ${app.blaetter.length} Mischblätter und ${app.bons.length} Kassenzettel gespeichert.`;
   const dlg = $('#dlg-backup');
   const meldung = (text, fehler = false) => {
     const el = $('#backup-meldung');
@@ -187,20 +245,20 @@ export async function startApp() {
   };
   app.backup = {
     async open() {
-      await Promise.all([editor.flush(), misch.flush()]);
+      await Promise.all([editor.flush(), misch.flush(), bon.flush()]);
       await app.refreshFaelle();
       meldung('');
       deliverable = null;
       $('#backup-share').hidden = true;
       $('#backup-download').hidden = true;
-      $('#backup-info').textContent = `${app.faelle.length} Zettel und ${app.blaetter.length} Mischblätter gespeichert.`;
+      $('#backup-info').textContent = bestand();
       dlg.showModal();
     },
   };
   $('#backup-export').addEventListener('click', async () => {
-    await Promise.all([editor.flush(), misch.flush()]);
+    await Promise.all([editor.flush(), misch.flush(), bon.flush()]);
     await app.refreshFaelle();
-    const json = JSON.stringify(buildBackup(app.faelle, app.blaetter), null, 1);
+    const json = JSON.stringify(buildBackup(app.faelle, app.blaetter, app.bons), null, 1);
     deliverable = fileDeliverable(new Blob([json], { type: 'application/json' }), backupFileName());
     await app.setSettings({ lastBackupAt: Date.now(), changesSinceBackup: 0 });
     if (deliverable.canShare) {
@@ -222,16 +280,18 @@ export async function startApp() {
     e.target.value = '';
     if (!file) return;
     try {
-      const { faelle, blaetter, ignoriert } = parseBackup(await file.text());
+      const { faelle, blaetter, bons, ignoriert } = parseBackup(await file.text());
       const mf = mergeFaelle(app.faelle, faelle);
       const mb = mergeFaelle(app.blaetter, blaetter);
+      const mk = mergeFaelle(app.bons, bons);
       for (const f of mf.zuSpeichern) await store.saveFall(f);
       for (const b of mb.zuSpeichern) await store.saveBlatt(b);
+      for (const b of mk.zuSpeichern) await store.saveBon(b);
       await app.refreshFaelle();
       await library.show();
-      $('#backup-info').textContent = `${app.faelle.length} Zettel und ${app.blaetter.length} Mischblätter gespeichert.`;
+      $('#backup-info').textContent = bestand();
       meldung(
-        `Eingelesen: ${mf.hinzu + mb.hinzu} neu, ${mf.aktualisiert + mb.aktualisiert} aktualisiert, ${mf.uebersprungen + mb.uebersprungen} unverändert${ignoriert ? `, ${ignoriert} unlesbar` : ''}.`,
+        `Eingelesen: ${mf.hinzu + mb.hinzu + mk.hinzu} neu, ${mf.aktualisiert + mb.aktualisiert + mk.aktualisiert} aktualisiert, ${mf.uebersprungen + mb.uebersprungen + mk.uebersprungen} unverändert${ignoriert ? `, ${ignoriert} unlesbar` : ''}.`,
       );
     } catch (err) {
       meldung(err.message, true);
@@ -244,6 +304,9 @@ export async function startApp() {
   library = createLibrary(app);
   present = createPresent(app);
   misch = createMischEditor(app);
+  bon = createBonEditor(app);
+  const bonDialog = createBonDialog(app);
+  $('#lib-bon').addEventListener('click', () => bonDialog.open());
   const zufall = createZufallDialog(app);
   const mischDialog = createMischDialog(app);
   $('#lib-zufall').addEventListener('click', () => zufall.open());
@@ -251,10 +314,10 @@ export async function startApp() {
   await app.refreshFaelle();
   await route();
   // Beim Wechsel der App (iPad) oder Schließen sofort speichern, nicht erst nach der kurzen Verzögerung
-  const alleSpeichern = () => Promise.all([editor.flush(), misch.flush()]).catch(() => {});
+  const alleSpeichern = () => Promise.all([editor.flush(), misch.flush(), bon.flush()]).catch(() => {});
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') alleSpeichern();
   });
   window.addEventListener('pagehide', alleSpeichern);
-  window.__lohnzettel = { app, getFall: () => editor.getFall(), getBlatt: () => misch.getBlatt(), flush: alleSpeichern };
+  window.__lohnzettel = { app, getFall: () => editor.getFall(), getBlatt: () => misch.getBlatt(), getBon: () => bon.getBon(), flush: alleSpeichern };
 }

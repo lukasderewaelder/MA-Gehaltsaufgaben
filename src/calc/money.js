@@ -27,6 +27,9 @@ export function fmtBp(bp) {
   return text.replace('.', ',');
 }
 
+/** Steuersatz mit genau einer Nachkommastelle: 1600 -> "16,0" */
+export const fmtSatz = (bp) => (bp / 100).toFixed(1).replace('.', ',');
+
 /** Zahl aus deutscher oder englischer Schreibweise ("1.234,5", "12,5", "12.5"); sonst null. */
 export function parseNumber(input) {
   let s = String(input ?? '').replace(/[\s€%]/g, '').replace('−', '-');

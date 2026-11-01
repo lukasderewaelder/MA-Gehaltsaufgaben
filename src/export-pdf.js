@@ -1,5 +1,6 @@
-// PDF-Export: jede A4-Seite -> Canvas (html2canvas) -> JPEG -> PDF-Seite (jsPDF).
+// PDF-Export: jede A4-Seite wird als echte PDF-Objekte gezeichnet (export-vektor.js). Nur wenn das scheitert, entsteht sie als Bild (html2canvas -> JPEG).
 // Die Seiten werden außerhalb des Bildschirms aufgebaut und dort in den Zettel eingepasst; die sichtbare Vorschau bleibt unberührt.
+import { zeichneSeite } from './export-vektor.js';
 import { paginiere } from './mischsheet.js';
 import { PAGE_H, PAGE_W, fitPages } from './worksheet.js';
 import { renderSeiten } from './yearsheet.js';
@@ -133,9 +134,17 @@ export async function createPdf(fall, modi, { quality = 0.92, scales = [2, 1.5, 
     const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
     for (let i = 0; i < pages.length; i++) {
       onProgress?.(i + 1, pages.length);
+      if (i > 0) pdf.addPage('a4', 'portrait');
+      try {
+        zeichneSeite(pdf, pages[i]);
+        continue;
+      } catch (err) {
+        console.warn('Seite wird als Bild eingefügt:', err);
+      }
       const canvas = await renderCanvas(pages[i], scales);
       try {
-        if (i > 0) pdf.addPage('a4', 'portrait');
+        pdf.setFillColor(255, 255, 255);
+        pdf.rect(0, 0, 210, 297, 'F');
         pdf.addImage(canvas.toDataURL('image/jpeg', quality), 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
       } finally {
         canvas.width = 0; // Speicher auf dem iPad sofort freigeben

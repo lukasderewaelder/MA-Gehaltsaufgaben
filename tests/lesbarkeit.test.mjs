@@ -1,7 +1,10 @@
 // Einfache Sprache für leistungsschwache 8.-Klässler: kurze Sätze, keine schweren Wörter in „Sehr einfach“.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { bonBeiblatt } from '../src/bonsheet.js';
+import { bonTeile, rechneBon } from '../src/calc/bon.js';
 import { berechne } from '../src/calc/payroll.js';
+import { defaultBonSpec, erzeugeBon } from '../src/generators/bons.js';
 import { AUFGABEN, defaultSpec, erzeugeFall } from '../src/generators/faelle.js';
 import { ALLE_TYPEN, defaultMischSpec, erzeugeMischblatt } from '../src/misch.js';
 import { renderAufgabe } from '../src/mischsheet.js';
@@ -109,5 +112,13 @@ test('Mischblatt und Jahresübersicht: kurze Sätze', () => {
   for (const t of jahrTeilaufgaben(f, jahresRechnung(f))) {
     pruefeKurz(t.text, 'Jahr');
     pruefeKurz(t.loesung, 'Jahr-Lösung');
+  }
+});
+
+test('Kassenzettel: kurze Sätze in Teilaufgaben und Beiblatt', () => {
+  for (const stufe of ['leicht', 'mittel', 'schwer']) {
+    const b = erzeugeBon(defaultBonSpec(stufe, 11));
+    for (const teil of bonTeile(b, rechneBon(b))) pruefeKurz(teil.text, stufe);
+    pruefeKurz(bonBeiblatt(b), 'Beiblatt');
   }
 });

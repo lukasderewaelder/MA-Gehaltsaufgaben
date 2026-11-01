@@ -99,6 +99,28 @@
 .aufgabe-tabelle .mz.lst td, .aufgabe-tabelle .mz.lst th { padding: 1px 6px; }
 .page-misch { gap: 12px; }
 
+/* Kassenzettel */
+#bon-pages { width: 794px; margin: 0 auto; }
+.bon-mitte { display: flex; justify-content: center; }
+.bon-reihe { display: flex; gap: 20px; align-items: flex-start; }
+.bon-reihe .teile { flex: 1; min-width: 0; }
+.bon { flex: none; width: 310px; padding: 14px 14px 10px; border: 1px solid #9ca3af; background: #fff; font: 12.5px/1.4 'Courier New', Courier, monospace; color: #111827; }
+.bon-kopf { text-align: center; margin-bottom: 8px; }
+.bon-kopf b { font-size: 15px; }
+.bz { display: flex; justify-content: space-between; gap: 8px; }
+.bz-menge { padding-left: 10px; }
+.bw { white-space: nowrap; text-align: right; }
+.bon-spalte { color: #4b5563; font-size: 11px; }
+.bon-linie { border-top: 1px dashed #111827; margin: 5px 0; }
+.bon-summe { font-weight: 700; font-size: 14px; }
+.bon-mwst { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+.bon-mwst th { font-weight: 400; text-align: left; }
+.bon-mwst .r, .bon-mwst th.r { text-align: right; }
+.bon-mwst td, .bon-mwst th { padding: 0 0 0 4px; }
+.bon-fuss { margin-top: 6px; text-align: center; font-size: 10.5px; color: #4b5563; }
+.bon .val.luecke { min-width: 52px; }
+.bon .val[role='button'] { cursor: pointer; }
+
 /* Ansicht im Editor */
 .pane-bar { display: flex; gap: 4px; align-items: center; margin-bottom: 4px; flex-wrap: wrap; }
 .pane-bar [role='tab'] { font: inherit; font-size: 0.85rem; min-height: 34px; padding: 0 9px; border: 1px solid var(--line); border-radius: 10px; background: #fff; cursor: pointer; }

@@ -1,11 +1,12 @@
 // Lokaler Speicher (IndexedDB). Fällt auf einen Arbeitsspeicher-Speicher zurück, wenn IndexedDB
 // nicht nutzbar ist (z. B. manche privaten Fenster) – dann zeigt die App eine Warnung.
+import { normalizeBon } from './bon.js';
 import { normalizeMisch } from './misch.js';
 import { DEFAULT_SETTINGS, normalizeFall } from './model.js';
 
 const DB_NAME = 'lohnzettel';
-const DB_VERSION = 2; // 2: Mischblätter ('blaetter')
-const STORES = ['faelle', 'blaetter', 'settings'];
+const DB_VERSION = 3; // 2: Mischblätter ('blaetter'), 3: Kassenzettel ('bons')
+const STORES = ['faelle', 'blaetter', 'bons', 'settings'];
 
 function request(req) {
   return new Promise((resolve, reject) => {
@@ -58,6 +59,15 @@ function buildApi(backend, persistent) {
     },
     saveBlatt: (blatt) => backend.put('blaetter', structuredClone(blatt)),
     deleteBlatt: (id) => backend.delete('blaetter', id),
+    async listBons() {
+      const all = await backend.getAll('bons');
+      return all.map((b) => normalizeBon(b)).filter(Boolean).sort((a, b) => b.updatedAt - a.updatedAt);
+    },
+    async getBon(id) {
+      return normalizeBon(await backend.get('bons', id));
+    },
+    saveBon: (bon) => backend.put('bons', structuredClone(bon)),
+    deleteBon: (id) => backend.delete('bons', id),
     async getSettings() {
       const rows = await backend.getAll('settings');
       return { ...DEFAULT_SETTINGS, ...Object.fromEntries(rows.map((r) => [r.key, r.value])) };

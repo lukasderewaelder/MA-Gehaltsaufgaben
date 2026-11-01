@@ -1,4 +1,5 @@
 // Jahresübersicht als Blatt: Tabelle der zwölf Monate mit Lücken, Diagramm, Steuerklassen- und Paarvergleich, Teilaufgaben.
+import { renderBonSeiten } from './bonsheet.js';
 import { fmtBp, fmtCents } from './calc/money.js';
 import { SPALTEN, jahresRechnung, klassenvergleich, paarvergleich } from './calc/year.js';
 import { berechne } from './calc/payroll.js';
@@ -141,6 +142,7 @@ export function renderJahr(fall, modus = 'arbeit') {
 /** Alle Seiten einer Ansicht: 'arbeit' | 'loesung' (Monatszettel mit Aufgaben) oder 'jahr-arbeit' | 'jahr-loesung'. */
 export function renderSeiten(fall, { modus = 'arbeit', interactive = false } = {}) {
   if (fall.aufgaben) return renderMisch(fall, { modus }); // Mischblatt (Seitenumbruch macht `paginiere` danach)
+  if (fall.kind === 'bon') return renderBonSeiten(fall, { modus });
   if (modus.startsWith('jahr-')) return renderJahr(fall, modus.slice(5));
   return renderBlatt(fall, berechne(fall), { modus, interactive });
 }

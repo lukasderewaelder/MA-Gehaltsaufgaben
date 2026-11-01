@@ -32,7 +32,7 @@ test('Teilaufgabentexte nennen Sätze und Steuerart', () => {
   const r = berechne(f);
   assert.match(teilText(f, r, 'lst'), /Steuerklasse 1 in der Lohnsteuertabelle/);
   f.steuer = { ...f.steuer, modus: 'prozent', prozent: 1500 };
-  assert.match(teilText(f, berechne(f), 'lst'), /15 % vom Steuer-Brutto/);
+  assert.match(teilText(f, berechne(f), 'lst'), /15,0 % vom Steuer-Brutto/);
   assert.match(teilText(f, r, `p:${f.posten[0].id}`), /Betrag für „Gehalt“/);
   assert.match(sachtextAuto(f, true), /Lena Berger arbeitet bei Sport Sommer GmbH/);
   assert.match(sachtextAuto(f, true), /Einige Werte fehlen\. Trage sie ein/);

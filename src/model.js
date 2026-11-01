@@ -40,7 +40,7 @@ export const BLOECKE = {
 
 export const KONFESSIONEN = { keine: '–', ev: 'ev', rk: 'rk' };
 
-const uid = () => (globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`);
+export const uid = () => (globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`);
 
 export function newPosten(typ, values = {}) {
   const def = POSTEN_TYPEN[typ] ?? POSTEN_TYPEN.gehalt;

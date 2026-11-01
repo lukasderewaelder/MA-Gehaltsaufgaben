@@ -33,6 +33,11 @@ body[data-view='editor'] #view-library,
 body[data-view='error'] #view-library,
 body[data-view='error'] #view-editor { display: none; }
 
+body:not([data-view='bon']) #view-bon { display: none; }
+body[data-view='bon'] #view-library,
+body[data-view='bon'] #view-editor,
+body[data-view='bon'] #view-misch,
+body[data-view='bon'] #view-present,
 body[data-view='present'] #view-library,
 body[data-view='present'] #view-editor,
 body[data-view='present'] #view-misch,
@@ -156,6 +161,8 @@ body:not([data-view='present']) #view-present { display: none; }
 .menu-liste .btn:hover { background: var(--blue-soft); }
 
 /* Drei Bereiche: Darstellung links, ganze Seite in der Mitte, Inhalt rechts */
+.bon-tab th:nth-child(n) { width: auto; }
+.bon-tab th:last-child { width: 44px; }
 .ed-body {
   --bar-h: 67px;
   display: grid;

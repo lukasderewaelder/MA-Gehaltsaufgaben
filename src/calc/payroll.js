@@ -2,7 +2,7 @@
 // Jedes Feld kann überschrieben werden (fall.ueberschreibungen); abhängige Felder rechnen mit dem überschriebenen Wert weiter.
 // Zu jedem Feld liefert `weg` den Rechenweg als Text (für Lösungsblatt und Vorführmodus).
 import { POSTEN_TYPEN } from '../model.js';
-import { bpOf, fmtBp, fmtCents, mul } from './money.js';
+import { bpOf, fmtBp, fmtCents, fmtSatz, mul } from './money.js';
 import { ratesFor } from './rates.js';
 import { sozialversicherung } from './sv.js';
 import { effektiverSatz, soliJahr, steuerabzuege } from './tax.js';
@@ -104,7 +104,7 @@ export function berechne(fall) {
   });
   const lstText =
     st.modus === 'prozent'
-      ? `${fmtBp(fall.steuer.prozent)} % von ${eur(st.prozentBasis ?? stBrutto)}`
+      ? `${fmtSatz(fall.steuer.prozent)} % von ${eur(st.prozentBasis ?? stBrutto)}`
       : st.modus === 'tabelle'
         ? `Tabelle, Steuerklasse ${fall.person.steuerklasse}, Zeile ${eur(st.tabelle?.von ?? 0)} bis ${eur(st.tabelle?.bis ?? 0)}${st.sonderLst ? ` plus Steuer auf den sonstigen Bezug (${eur(st.sonderLst)})` : ''}`
         : `Jahressteuer nach Tarif für ${st.zvE ?? 0} € zu versteuerndes Einkommen, geteilt durch 12`;

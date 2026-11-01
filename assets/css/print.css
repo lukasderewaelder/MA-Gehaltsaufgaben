@@ -13,8 +13,9 @@ body[data-view='editor'] #view-editor { display: block !important; }
 
 /* Seiten (Arbeits-/Lösungsblatt, Jahresübersicht, Mischblatt) */
 body[data-view='misch'] #view-misch { display: block !important; }
+body[data-view='bon'] #view-bon { display: block !important; }
 #mi-hint { display: none !important; }
-#pages-host, #mi-pages { zoom: 1 !important; width: 794px; margin: 0; }
+#pages-host, #mi-pages, #bon-pages { zoom: 1 !important; width: 794px; margin: 0; }
 .page { margin: 0 !important; box-shadow: none; break-after: page; page-break-after: always; }
 .page:last-child { break-after: auto; page-break-after: auto; }
 .page.is-overflow { outline: none; }

@@ -36,6 +36,7 @@
       <button type="button" id="lib-backup" class="btn">Sicherung</button>
       <button type="button" id="lib-zufall" class="btn">Zufallsfall</button>
       <button type="button" id="lib-misch" class="btn">Mischblatt</button>
+      <button type="button" id="lib-bon" class="btn">Kassenzettel</button>
       <button type="button" id="lib-neu" class="btn btn-primary">Neuer Zettel</button>
     </header>
     <div id="backup-reminder" class="banner banner-info" hidden>
@@ -146,6 +147,51 @@
       <section class="ed-rechts" aria-label="Aufgaben"><div id="mi-form" class="ed-form"></div></section>
     </div>
   </div>
+
+  <!-- Kassenzettel-Editor -->
+  <div id="view-bon">
+    <header class="edbar">
+      <button type="button" id="bon-back" class="btn">← Übersicht</button>
+      <input id="bon-titel" class="ed-titel" type="text" aria-label="Titel des Kassenzettels" autocomplete="off">
+      <span class="spacer"></span>
+      <button type="button" id="bon-wuerfeln-neu" class="btn" title="Gleiche Einstellungen, neuer Zufall" hidden>Neu würfeln</button>
+      <button type="button" id="bon-dup" class="btn">Duplizieren</button>
+      <button type="button" id="bon-pdf" class="btn btn-primary">PDF erstellen …</button>
+    </header>
+    <div class="ed-body">
+      <aside id="bon-links" class="ed-links" aria-label="Darstellung"></aside>
+      <section id="bon-preview" class="ed-preview" aria-label="Vorschau">
+        <div class="pane-bar" role="tablist" aria-label="Ansicht">
+          <button type="button" role="tab" id="btab-zettel" data-bpane="zettel" aria-selected="true">Bon</button>
+          <button type="button" role="tab" id="btab-arbeit" data-bpane="arbeit" aria-selected="false">Arbeitsblatt</button>
+          <button type="button" role="tab" id="btab-loesung" data-bpane="loesung" aria-selected="false">Lösungsblatt</button>
+        </div>
+        <p id="bon-hint" class="hint" aria-live="polite"></p>
+        <div id="bon-pages" role="tabpanel"></div>
+      </section>
+      <section class="ed-rechts" aria-label="Inhalt">
+        <div class="steps" role="tablist" aria-label="Inhalt">
+          <button type="button" role="tab" data-bschritt="bon" aria-selected="true">Bon</button>
+          <button type="button" role="tab" data-bschritt="aufgabe" aria-selected="false" tabindex="-1">Aufgabe</button>
+        </div>
+        <div id="bon-eingaben" class="ed-form"></div>
+      </section>
+    </div>
+  </div>
+
+  <!-- Kassenzettel erzeugen -->
+  <dialog id="dlg-bon" aria-labelledby="bon-dlg-titel">
+    <form id="bon-form" method="dialog">
+      <h2 id="bon-dlg-titel">Kassenzettel erzeugen</h2>
+      <div id="bon-felder"></div>
+      <p id="bon-vorschau" class="weg" aria-live="polite"></p>
+      <div class="dlg-actions">
+        <button type="button" class="btn" data-close>Abbrechen</button>
+        <button type="button" class="btn" id="bon-leer">Selbst eintragen</button>
+        <button type="submit" class="btn btn-primary" id="bon-ok">Erzeugen</button>
+      </div>
+    </form>
+  </dialog>
 
   <!-- Mischblatt erzeugen -->
   <dialog id="dlg-misch" aria-labelledby="misch-titel">

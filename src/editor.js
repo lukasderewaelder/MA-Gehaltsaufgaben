@@ -1,6 +1,6 @@
 // Fall-Editor: Live-Vorschau in der Mitte, Einstellungen des gewählten Schritts rechts, Überschreiben einzelner Felder per Klick.
 import { berechne, setzeSteuersatz } from './calc/payroll.js';
-import { fmtBp, fmtCents, parseScaled } from './calc/money.js';
+import { fmtBp, fmtCents, fmtSatz, parseScaled } from './calc/money.js';
 import { YEARS } from './calc/rates.js';
 import { effektiverSatz, erlaubteSaetze, satzBand } from './calc/tax.js';
 import { BLOECKE, KONFESSIONEN, MONATE, POSTEN_TYPEN, STEUERMODI, newPosten, normalizeFall, pruneOverrides } from './model.js';
@@ -19,14 +19,14 @@ const PANE_HINWEIS = {
   'jahr-loesung': 'Grün sind die Werte, die im Aufgabenblatt fehlen.',
 };
 
-const getAt = (obj, path) => path.split('.').reduce((a, k) => a?.[k], obj);
-function setAt(obj, path, value) {
+export const getAt = (obj, path) => path.split('.').reduce((a, k) => a?.[k], obj);
+export function setAt(obj, path, value) {
   const keys = path.split('.');
   const last = keys.pop();
   keys.reduce((a, k) => a[k], obj)[last] = value;
 }
 
-const FORMAT = {
+export const FORMAT = {
   text: (v) => v ?? '',
   int: (v) => String(v ?? ''),
   money: (v) => fmtCents(v ?? 0),
@@ -34,21 +34,29 @@ const FORMAT = {
   bp: (v) => fmtBp(v ?? 0),
 };
 
-const input = (label, path, kind, fall, extra = '') =>
+export const input = (label, path, kind, fall, extra = '') =>
   `<label class="f"><span>${label}</span><input data-bind="${path}" data-kind="${kind}" value="${esc(FORMAT[kind](getAt(fall, path)))}"${
     kind === 'text' ? '' : kind === 'int' ? ' inputmode="numeric"' : ' inputmode="decimal"'
   } ${extra}></label>`;
 
-const select = (label, path, options, fall, kind = 'text') =>
+export const select = (label, path, options, fall, kind = 'text') =>
   `<label class="f"><span>${label}</span><select data-bind="${path}" data-kind="${kind}">${options
     .map(([v, t]) => `<option value="${esc(v)}"${String(getAt(fall, path)) === String(v) ? ' selected' : ''}>${esc(t)}</option>`)
     .join('')}</select></label>`;
 
-const check = (label, path, fall) =>
+export const check = (label, path, fall) =>
   `<label class="f f-check"><input type="checkbox" data-bind="${path}" data-kind="bool"${getAt(fall, path) ? ' checked' : ''}><span>${label}</span></label>`;
 
+export function readValue(el) {
+  const kind = el.dataset.kind;
+  if (kind === 'bool') return el.checked;
+  if (kind === 'text') return el.value;
+  if (kind === 'int') return Number.isFinite(Number(el.value)) && el.value.trim() !== '' ? Math.round(Number(el.value)) : null;
+  return parseScaled(el.value, 100);
+}
+
 /** Eingabefeld für eine Tabellenzelle: ohne sichtbare Beschriftung, der Name steht in `aria-label`. */
-const zelle = (label, path, kind, fall) =>
+export const zelle = (label, path, kind, fall) =>
   `<td><input aria-label="${esc(label)}" data-bind="${path}" data-kind="${kind}" value="${esc(FORMAT[kind](getAt(fall, path)))}"${kind === 'text' ? '' : ' inputmode="decimal"'}></td>`;
 
 /** Ein Posten als Tabellenzeile; Lohnart, Steuer und Sozialversicherung stehen in einer aufklappbaren zweiten Zeile. */
@@ -151,11 +159,11 @@ function satzAuswahl(fall, r) {
   const band = satzBand(r.gesamtBrutto);
   const tabellenSatz = effektiverSatz(r.gesamtBrutto, k, r.rates);
   const optionen = erlaubteSaetze(k, r.rates)
-    .map((bp) => `<option value="${bp}"${bp === fall.steuer.prozent ? ' selected' : ''}>${fmtBp(bp)} %</option>`)
+    .map((bp) => `<option value="${bp}"${bp === fall.steuer.prozent ? ' selected' : ''}>${fmtSatz(bp)} %</option>`)
     .join('');
   return `<div class="satz-block"><label class="f"><span>${fall.anzeige.einfach ? 'Steuersatz (% vom Brutto)' : 'Steuersatz (% vom Steuer-Brutto)'}</span>
       <select data-bind="steuer.prozent" data-kind="int"${ablesen ? ' disabled' : ''}>${optionen}</select></label>
-    <div class="satz-vorschlag"><span class="muted">Laut Tabelle (Klasse ${k}, ${fmtCents(band.von)} bis unter ${fmtCents(band.bis)} € brutto): <b>${fmtBp(tabellenSatz)} %</b>${
+    <div class="satz-vorschlag"><span class="muted">Laut Tabelle (Klasse ${k}, ${fmtCents(band.von)} bis unter ${fmtCents(band.bis)} € brutto): <b>${fmtSatz(tabellenSatz)} %</b>${
       ablesen ? ' – der Satz folgt dem Band, weil die Schüler ihn ablesen.' : ''
     }</span>
     ${ablesen ? '' : '<button type="button" class="btn btn-small" data-action="satz-tabelle">Satz aus Tabelle übernehmen</button>'}</div></div>`;
@@ -391,14 +399,6 @@ export function createEditor(app) {
   };
 
   // --- Formular -----------------------------------------------------------------------------------
-  function readValue(el) {
-    const kind = el.dataset.kind;
-    if (kind === 'bool') return el.checked;
-    if (kind === 'text') return el.value;
-    if (kind === 'int') return Number.isFinite(Number(el.value)) && el.value.trim() !== '' ? Math.round(Number(el.value)) : null;
-    return parseScaled(el.value, 100);
-  }
-
   const aufFormular = (art, fn) => [formHost, linksHost].forEach((h) => h.addEventListener(art, fn));
   aufFormular('input', (e) => {
     const text = e.target.closest('[data-action="sachtext"],[data-action="teiltext"]');

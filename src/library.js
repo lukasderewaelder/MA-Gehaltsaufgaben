@@ -2,6 +2,7 @@
 import { berechne } from './calc/payroll.js';
 import { fmtCents } from './calc/money.js';
 import { backupReminder } from './backup.js';
+import { rechneBon } from './calc/bon.js';
 import { MISCH_TYPEN } from './misch.js';
 import { MONATE, newFall } from './model.js';
 import { SCENARIOS, scenarioById } from './scenarios.js';
@@ -45,6 +46,22 @@ export function createLibrary(app) {
     return li;
   }
 
+  function bonKarte(bon) {
+    const li = document.createElement('li');
+    li.className = 'card card-bon';
+    li.innerHTML = `
+      <button type="button" class="card-open" data-id="${esc(bon.id)}" data-art="bon">
+        <span class="card-title">${esc(bon.titel)}</span>
+        <span class="card-sub">Kassenzettel · ${esc(bon.laden)} · ${bon.zeilen.length} Zeilen</span>
+        <span class="card-sum"><span>Summe <b>${fmtCents(rechneBon(bon).summe)} €</b></span></span>
+      </button>
+      <div class="card-actions">
+        <button type="button" class="btn btn-small" data-act="dup" data-art="bon" data-id="${esc(bon.id)}">Duplizieren</button>
+        <button type="button" class="btn btn-small btn-danger" data-act="del" data-art="bon" data-id="${esc(bon.id)}">Löschen</button>
+      </div>`;
+    return li;
+  }
+
   function renderReminder() {
     const text = backupReminder(app.settings, app.anzahlGespeichert());
     $('#backup-reminder').hidden = !text;
@@ -54,6 +71,14 @@ export function createLibrary(app) {
   list.addEventListener('click', async (e) => {
     const btn = e.target.closest('button[data-id]');
     if (!btn) return;
+    if (btn.dataset.art === 'bon') {
+      const bon = app.bons.find((b) => b.id === btn.dataset.id);
+      if (!bon) return;
+      if (btn.dataset.act === 'dup') await app.duplicateBon(bon, { open: false });
+      else if (btn.dataset.act === 'del') await app.deleteBon(bon);
+      else app.go(`#/bon/${encodeURIComponent(bon.id)}`);
+      return;
+    }
     if (btn.dataset.art === 'misch') {
       const blatt = app.blaetter.find((b) => b.id === btn.dataset.id);
       if (!blatt) return;
@@ -95,7 +120,7 @@ export function createLibrary(app) {
       document.body.dataset.view = 'library';
       document.title = 'Lohnzettel-Werkstatt';
       $('#lib-empty').hidden = app.anzahlGespeichert() > 0;
-      const eintraege = [...app.faelle.map((f) => ({ zeit: f.updatedAt, karte: () => card(f) })), ...app.blaetter.map((b) => ({ zeit: b.updatedAt, karte: () => blattKarte(b) }))];
+      const eintraege = [...app.faelle.map((f) => ({ zeit: f.updatedAt, karte: () => card(f) })), ...app.blaetter.map((b) => ({ zeit: b.updatedAt, karte: () => blattKarte(b) })), ...app.bons.map((b) => ({ zeit: b.updatedAt, karte: () => bonKarte(b) }))];
       list.replaceChildren(...eintraege.sort((a, b) => b.zeit - a.zeit).map((e) => e.karte()));
       renderReminder();
     },
