@@ -544,8 +544,11 @@ test('Kassenzettel: erzeugen, ändern, gesucht, Lösung, PDF, Wiederfinden', asy
 });
 
 /** Zählt Zeilen der Texte und prüft Rechnungen und Überlauf im sichtbaren Blattbereich. */
-const umbruchPruefen = (page, wurzel) =>
-  page.evaluate((sel) => {
+const umbruchPruefen = async (page, wurzel) => {
+  await page.evaluate(() => document.fonts.ready);
+  await page.waitForFunction((sel) => document.querySelector(sel).style.zoom !== '', wurzel);
+  await page.waitForTimeout(150); // Layout nach dem Zoom setzen lassen
+  return page.evaluate((sel) => {
     const root = document.querySelector(sel);
     const zoom = Number(root.style.zoom) || 1;
     const zeilen = (el) => Math.round(el.getBoundingClientRect().height / zoom / (parseFloat(getComputedStyle(el).lineHeight) || 16));
@@ -556,6 +559,7 @@ const umbruchPruefen = (page, wurzel) =>
       voll: [...root.querySelectorAll('.page.is-overflow')].length,
     };
   }, wurzel);
+};
 
 test('Nichts bricht um: Rechnungen in einer Zeile, Aufgabentexte höchstens zwei Zeilen, Beiblätter passen auf die Seite', async () => {
   const { context, page, problems, foreign } = await app.openApp();
