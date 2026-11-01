@@ -1,6 +1,6 @@
 // Arbeitsblatt und Lösungsblatt: Teilaufgaben aus den gesuchten Feldern, Beiblatt „Abzüge im Überblick“, Seitenaufbau (A4).
 import { bpOf, fmtBp, fmtCents } from './calc/money.js';
-import { SATZ_BRUTTO, satzTabelle, tabellenLohnsteuer, tabellenStufe } from './calc/tax.js';
+import { effektiverSatz, satzBand, satzTabelle, tabellenLohnsteuer, tabellenStufe } from './calc/tax.js';
 import { MONATE, POSTEN_TYPEN } from './model.js';
 import { rueckPlan } from './rueck.js';
 import { esc, feldName, fmtWert, renderSlip } from './slip.js';
@@ -158,27 +158,27 @@ export function teilaufgaben(fall, r, plan = rueckPlan(fall, r)) {
 const KLASSEN_NAME = ['I', 'II', 'III', 'IV', 'V', 'VI'];
 
 /**
- * Kleine Tabelle: Steuersatz in Prozent nach Brutto (Zeilen) und Steuerklasse (Spalten).
- * Im Lösungsblatt sind die Spalte der Steuerklasse und die Zeile, die zum Brutto am besten passt, markiert.
+ * Kleine Tabelle: Steuersatz in Prozent nach Brutto-Band (Zeilen: von … bis unter …) und Steuerklasse (Spalten).
+ * Im Lösungsblatt sind die Spalte der Steuerklasse und das Band des Brutto markiert.
  */
 export function satzTabelleHtml(fall, r, { modus = 'arbeit' } = {}) {
   const t = satzTabelle(r.rates);
   const k = fall.person.steuerklasse;
-  const naechste = SATZ_BRUTTO.reduce((a, b) => (Math.abs(b - r.gesamtBrutto) < Math.abs(a - r.gesamtBrutto) ? b : a));
+  const band = satzBand(r.gesamtBrutto).von;
   const loesung = modus === 'loesung';
   const kopf = t.klassen.map((c) => `<th class="r${loesung && c === k ? ' treffer' : ''}">Klasse ${KLASSEN_NAME[c - 1]}</th>`).join('');
   const body = t.zeilen
     .map((z) => {
-      const treffer = loesung && z.brutto === naechste;
+      const treffer = loesung && z.von === band;
       const zellen = z.saetze
         .map((bp, i) => `<td class="r${treffer ? ' treffer' : ''}${loesung && t.klassen[i] === k ? ' spalte' : ''}">${fmtBp(bp)} %</td>`)
         .join('');
-      return `<tr><td>${fmtCents(z.brutto)} €</td>${zellen}</tr>`;
+      return `<tr><td>${fmtCents(z.von)} € bis unter ${fmtCents(z.bis)} €</td>${zellen}</tr>`;
     })
     .join('');
   return `<h3>Steuersatz nach Brutto und Steuerklasse</h3>
       <table class="mz lst"><thead><tr><th>Brutto im Monat</th>${kopf}</tr></thead><tbody>${body}</tbody></table>
-      <p class="klein">So viel Prozent vom Brutto gehen als Lohnsteuer ab (gerundet). Je mehr Brutto, desto höher der Satz.</p>`;
+      <p class="klein">So viel Prozent vom Brutto gehen als Lohnsteuer ab (gerundet auf eine Nachkommastelle). Such die Zeile, in der das Brutto liegt. Je mehr Brutto, desto höher der Satz.</p>`;
 }
 
 /**
@@ -235,6 +235,7 @@ export function merkzettel(fall, r, { modus = 'arbeit', allgemein = false, tabel
   const einfach = Boolean(fall.anzeige.einfach);
   const s = r.saetze;
   const bsp = 200000; // Beispiel: 2.000 € Brutto
+  const bspSatz = effektiverSatz(bsp, fall.person.steuerklasse, rates); // Satz der Tabelle für dieses Brutto
   const von = (bp) => `${fmtCents(bp)} €`;
   const zeilen = [
     ['kv', 'Krankenversicherung (KV)', `${fmtBp(rates.kvAllgemein * 2 + fall.person.zusatzbeitrag)} %`, `${fmtBp(s.kv)} %`],
@@ -250,7 +251,7 @@ export function merkzettel(fall, r, { modus = 'arbeit', allgemein = false, tabel
   if (fall.steuer.modus === 'prozent') {
     steuer = `<p>Die <b>Lohnsteuer</b> bekommt der Staat. In diesen Aufgaben rechnen wir mit einem <b>festen Steuersatz</b>.</p>
       <p class="formel">Lohnsteuer = Brutto · Steuersatz</p>
-      <p><b>Beispiel:</b> Brutto 2.000 €, Steuersatz 15 %. Rechnung: 2.000 € · 15 % = <b>300,00 €</b>.</p>
+      <p><b>Beispiel:</b> Brutto 2.000 €, Steuersatz ${fmtBp(bspSatz)} %. Rechnung: 2.000 € · ${fmtBp(bspSatz)} % = <b>${von(bpOf(bsp, bspSatz))}</b>.</p>
       ${satzTabelleHtml(fall, r, { modus })}`;
   } else if (fall.steuer.modus === 'tabelle') {
     steuer = `<p>Die <b>Lohnsteuer</b> bekommt der Staat. Wie viel es ist, hängt vom Brutto und von der Steuerklasse ab. Du liest sie in der Tabelle ab.</p>

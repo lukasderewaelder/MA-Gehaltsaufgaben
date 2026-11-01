@@ -2,7 +2,7 @@
 import { berechne, setzeSteuersatz } from './calc/payroll.js';
 import { fmtBp, fmtCents, parseScaled } from './calc/money.js';
 import { YEARS } from './calc/rates.js';
-import { effektiverSatz } from './calc/tax.js';
+import { effektiverSatz, erlaubteSaetze, satzBand } from './calc/tax.js';
 import { BLOECKE, KONFESSIONEN, MONATE, POSTEN_TYPEN, STEUERMODI, newPosten, normalizeFall, pruneOverrides } from './model.js';
 import { erzeugeFall, randomSeed } from './generators/faelle.js';
 import { BEITRAEGE, RUECK_TYPEN, STUNDEN_ARTEN, rueckPlan } from './rueck.js';
@@ -119,6 +119,23 @@ function aufgabeForm(fall, r) {
   </details>`;
 }
 
+/** Fester Steuersatz: nur Werte der Steuersatz-Tabelle (Spalte der Steuerklasse); beim Ablesen folgt der Satz dem Brutto-Band. */
+function satzAuswahl(fall, r) {
+  const k = fall.person.steuerklasse;
+  const ablesen = fall.aufgabe.satzAblesen;
+  const band = satzBand(r.gesamtBrutto);
+  const tabellenSatz = effektiverSatz(r.gesamtBrutto, k, r.rates);
+  const optionen = erlaubteSaetze(k, r.rates)
+    .map((bp) => `<option value="${bp}"${bp === fall.steuer.prozent ? ' selected' : ''}>${fmtBp(bp)} %</option>`)
+    .join('');
+  return `<div class="satz-block"><label class="f"><span>${fall.anzeige.einfach ? 'Steuersatz (% vom Brutto)' : 'Steuersatz (% vom Steuer-Brutto)'}</span>
+      <select data-bind="steuer.prozent" data-kind="int"${ablesen ? ' disabled' : ''}>${optionen}</select></label>
+    <div class="satz-vorschlag"><span class="muted">Laut Tabelle (Klasse ${k}, ${fmtCents(band.von)} bis unter ${fmtCents(band.bis)} € brutto): <b>${fmtBp(tabellenSatz)} %</b>${
+      ablesen ? ' – der Satz folgt dem Band, weil die Schüler ihn ablesen.' : ''
+    }</span>
+    ${ablesen ? '' : '<button type="button" class="btn btn-small" data-action="satz-tabelle">Satz aus Tabelle übernehmen</button>'}</div></div>`;
+}
+
 function jahrForm(fall) {
   const jb = fall.jahresblatt;
   return `<details><summary>Jahresübersicht</summary>
@@ -165,9 +182,7 @@ function formHtml(fall, r) {
     ${select('So wird die Lohnsteuer bestimmt', 'steuer.modus', Object.entries(STEUERMODI), fall)}
     ${
       fall.steuer.modus === 'prozent'
-        ? `${input(fall.anzeige.einfach ? 'Steuersatz (% vom Brutto)' : 'Steuersatz (% vom Steuer-Brutto)', 'steuer.prozent', 'bp', fall)}
-    <div class="satz-vorschlag"><span class="muted">Vorschlag laut Tabelle (Steuerklasse ${fall.person.steuerklasse}, ${fmtCents(r.gesamtBrutto)} € brutto): <b>${fmtBp(effektiverSatz(r.gesamtBrutto, fall.person.steuerklasse, r.rates))} %</b></span>
-    <button type="button" class="btn btn-small" data-action="satz-tabelle">Satz aus Tabelle übernehmen</button></div>
+        ? `${satzAuswahl(fall, r)}
     ${check('Die Schüler lesen den Steuersatz in der Tabelle auf dem Beiblatt ab (er steht nicht im Aufgabentext)', 'aufgabe.satzAblesen', fall)}`
         : ''
     }
@@ -286,8 +301,20 @@ export function createEditor(app) {
     clearTimeout(saveTimer);
     saveTimer = setTimeout(persist, 400);
   };
+  /** Beim Ablesen aus der Tabelle folgt der Satz dem Brutto-Band (Brutto, Posten oder Steuerklasse haben sich geändert). */
+  function satzNachfuehren() {
+    if (fall.steuer.modus === 'prozent' && fall.aufgabe.satzAblesen) setzeSteuersatz(fall);
+  }
+  /** Zeichnet nur den Satz-Block neu, damit ein Eingabefeld seinen Fokus behält. */
+  function satzBlockErneuern() {
+    const block = formHost.querySelector('.satz-block');
+    if (!block || block.contains(document.activeElement)) return;
+    block.outerHTML = satzAuswahl(fall, result());
+  }
   const changed = ({ form = false } = {}) => {
+    satzNachfuehren();
     if (form) renderForm();
+    else satzBlockErneuern();
     renderSlipNow();
     scheduleSave();
   };
@@ -346,7 +373,11 @@ export function createEditor(app) {
     const value = readValue(el);
     if (value === null) return;
     setAt(fall, el.dataset.bind, value);
-    if (el.dataset.bind === 'person.minijob' || el.dataset.bind.startsWith('anzeige.') || el.dataset.bind === 'steuer.modus' || el.dataset.bind === 'jahresblatt.vergleich') {
+    if (el.dataset.bind === 'person.steuerklasse' && fall.steuer.modus === 'prozent') setzeSteuersatz(fall); // der Satz gehört zur Spalte der Steuerklasse
+    if (
+      ['person.minijob', 'person.steuerklasse', 'aufgabe.satzAblesen', 'steuer.modus', 'jahresblatt.vergleich'].includes(el.dataset.bind) ||
+      el.dataset.bind.startsWith('anzeige.')
+    ) {
       normalizeInPlace();
       changed({ form: true });
       return;

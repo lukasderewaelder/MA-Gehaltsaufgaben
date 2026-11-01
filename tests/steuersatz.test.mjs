@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { berechne, setzeSteuersatz } from '../src/calc/payroll.js';
 import { ratesFor } from '../src/calc/rates.js';
-import { SATZ_BRUTTO, effektiverSatz, satzTabelle } from '../src/calc/tax.js';
+import { SATZ_BIS, SATZ_BREITE, SATZ_VON, effektiverSatz, erlaubteSaetze, naechsterSatz, satzBand, satzTabelle } from '../src/calc/tax.js';
 import { defaultSpec, erzeugeFall } from '../src/generators/faelle.js';
 import { defaultMischSpec, erzeugeMischblatt } from '../src/misch.js';
 import { renderAufgabe } from '../src/mischsheet.js';
@@ -13,29 +13,67 @@ import { lohnsteuerTabelle, renderBlatt, satzTabelleHtml, teilText, teilaufgaben
 
 const R = ratesFor(2026);
 
-test('Effektiver Steuersatz: ganze Prozent, steigt mit dem Brutto, III < I < V', () => {
+test('Effektiver Steuersatz: eine Nachkommastelle, steigt mit dem Brutto, III < I < V', () => {
   let letzter = -1;
   for (let brutto = 100000; brutto <= 600000; brutto += 25000) {
     const satz = effektiverSatz(brutto, 1, R);
-    assert.equal(satz % 100, 0, 'ganze Prozent');
+    assert.equal(satz % 10, 0, 'Vielfaches von 0,1 %');
     assert.ok(satz >= letzter, `steigt: ${brutto}`);
     letzter = satz;
   }
-  assert.equal(effektiverSatz(300000, 1, R), 1000, '3.000 €, Klasse I: 10 %');
-  for (const brutto of SATZ_BRUTTO.slice(2)) {
+  assert.equal(effektiverSatz(300000, 1, R), 1030, '3.000 €, Klasse I: 10,3 % (Band 3.000 bis unter 3.250 €)');
+  for (let brutto = 200000; brutto < SATZ_BIS; brutto += SATZ_BREITE) {
     assert.ok(effektiverSatz(brutto, 3, R) < effektiverSatz(brutto, 1, R), `III < I bei ${brutto}`);
     assert.ok(effektiverSatz(brutto, 1, R) < effektiverSatz(brutto, 5, R), `I < V bei ${brutto}`);
   }
   assert.equal(effektiverSatz(0, 1, R), 0);
 });
 
-test('Kleine Tabelle: acht Zeilen von 1.500 bis 5.000 €, sechs Steuerklassen', () => {
+test('Kleine Tabelle: Bänder zu 250 € von 1.500 bis unter 5.500 € ohne Lücken, sechs Steuerklassen', () => {
   const t = satzTabelle(R);
-  assert.deepEqual(t.zeilen.map((z) => z.brutto), [150000, 200000, 250000, 300000, 350000, 400000, 450000, 500000]);
+  assert.equal(t.zeilen.length, 16);
+  assert.equal(t.zeilen[0].von, SATZ_VON);
+  assert.equal(t.zeilen.at(-1).bis, SATZ_BIS);
+  t.zeilen.forEach((z, i) => {
+    assert.equal(z.bis - z.von, SATZ_BREITE);
+    if (i) assert.equal(z.von, t.zeilen[i - 1].bis, 'Bänder grenzen aneinander');
+  });
   assert.deepEqual(t.klassen, [1, 2, 3, 4, 5, 6]);
-  assert.ok(t.zeilen.every((z) => z.saetze.length === 6 && z.saetze.every((s) => s >= 0 && s <= 5000)));
+  assert.ok(t.zeilen.every((z) => z.saetze.length === 6 && z.saetze.every((s) => s >= 0 && s <= 3000 && s % 10 === 0)));
   // Klasse I und IV haben dieselben Sätze (ohne Faktorverfahren)
   assert.ok(t.zeilen.every((z) => z.saetze[0] === z.saetze[3]));
+});
+
+test('Band: jedes Brutto liegt in genau einem Band, außerhalb gilt das Randband', () => {
+  assert.equal(satzBand(300000).von, 300000);
+  assert.equal(satzBand(324999).von, 300000);
+  assert.equal(satzBand(325000).von, 325000);
+  assert.equal(satzBand(10000).von, SATZ_VON);
+  assert.equal(satzBand(900000).bis, SATZ_BIS);
+});
+
+test('Erlaubte Sätze: nur Werte der Tabelle, keine Zwischenwerte', () => {
+  const t = satzTabelle(R);
+  for (const k of [1, 2, 3, 4, 5, 6]) {
+    const erlaubt = erlaubteSaetze(k, R);
+    assert.deepEqual(erlaubt, [...new Set(t.zeilen.map((z) => z.saetze[k - 1]))].sort((a, b) => a - b));
+    assert.ok(erlaubt.every((s, i) => !i || s > erlaubt[i - 1]), 'aufsteigend, ohne Doppelte');
+  }
+  const k1 = erlaubteSaetze(1, R);
+  assert.ok(k1.includes(1030));
+  assert.ok(!k1.includes(900) && !k1.includes(1000), '9 % und 10 % stehen in Klasse I nicht in der Tabelle');
+  assert.equal(naechsterSatz(900, 1, R), 930, '9 % wird auf den nächsten Tabellenwert gesetzt');
+  assert.equal(naechsterSatz(1030, 1, R), 1030);
+});
+
+test('normalizeFall rastet einen festen Steuersatz auf einen Tabellenwert ein', () => {
+  const f = newFall();
+  f.steuer.prozent = 1000;
+  const n = normalizeFall(f);
+  assert.ok(erlaubteSaetze(1, R).includes(n.steuer.prozent));
+  assert.equal(n.steuer.prozent, 1030);
+  f.steuer.modus = 'tabelle';
+  assert.equal(normalizeFall(f).steuer.prozent, 1000, 'nur im Modus „fester Steuersatz“');
 });
 
 test('Neue Zettel starten mit festem Steuersatz, ohne Soli, Satz passt zur Tabelle', () => {
@@ -46,7 +84,7 @@ test('Neue Zettel starten mit festem Steuersatz, ohne Soli, Satz passt zur Tabel
   assert.equal(f.anzeige.einfach, false);
   assert.equal(f.aufgabe.satzAblesen, false);
   const r = berechne(f);
-  assert.equal(r.lst, Math.round((300000 * 1000) / 10000));
+  assert.equal(r.lst, Math.round((300000 * f.steuer.prozent) / 10000));
   assert.equal(r.soli, 0);
 });
 
@@ -90,11 +128,11 @@ test('Alte Zettel behalten ihren Steuermodus, fehlende Angaben bleiben wie früh
 test('Steuersatz im Text oder in der Tabelle ablesen', () => {
   const f = newFall({ posten: [newPosten('gehalt', { faktor: 300000 })] });
   const r = berechne(f);
-  assert.match(teilText(f, r, 'lst'), /Der Steuersatz ist 10 %\. Rechne 10 % vom Steuer-Brutto\./);
+  assert.match(teilText(f, r, 'lst'), /Der Steuersatz ist 10,3 %\. Rechne 10,3 % vom Steuer-Brutto\./);
   f.aufgabe.satzAblesen = true;
   const ablesen = teilText(f, r, 'lst');
   assert.match(ablesen, /Tabelle auf dem Beiblatt \(Steuerklasse 1, Zeile mit dem Brutto\)/);
-  assert.doesNotMatch(ablesen, /10 %/, 'der Satz steht nicht im Text');
+  assert.doesNotMatch(ablesen, /10,3 %/, 'der Satz steht nicht im Text');
   // Die Tabelle steht im Beiblatt; im Lösungsblatt sind Zeile und Spalte markiert, im Arbeitsblatt nicht
   f.aufgabe.beiblatt = true;
   f.aufgabe.gesucht = ['lst'];
@@ -103,7 +141,7 @@ test('Steuersatz im Text oder in der Tabelle ablesen', () => {
   assert.match(arbeit, /Steuersatz nach Brutto und Steuerklasse/);
   assert.doesNotMatch(arbeit.slice(arbeit.indexOf('Steuersatz nach Brutto')), /treffer/);
   assert.match(loesung.slice(loesung.indexOf('Steuersatz nach Brutto')), /class="r treffer"/);
-  assert.match(loesung, /Steuersatz ist 10 %|10 % von|10 %/);
+  assert.match(loesung, /10,3 %/);
   assert.equal(teilaufgaben(f, r).length, 1);
 });
 
@@ -111,9 +149,9 @@ test('Satz-Tabelle in der Lösung markiert die passende Zeile und Spalte', () =>
   const f = newFall({ posten: [newPosten('gehalt', { faktor: 310000 })] });
   f.person.steuerklasse = 3;
   const html = satzTabelleHtml(f, berechne(f), { modus: 'loesung' });
-  const markiert = [...html.matchAll(/<tr><td>([\d.,]+) €<\/td>(.*?)<\/tr>/g)].filter((m) => m[2].includes('treffer'));
+  const markiert = [...html.matchAll(/<tr><td>([\d.,]+) € bis unter [\d.,]+ €<\/td>(.*?)<\/tr>/g)].filter((m) => m[2].includes('treffer'));
   assert.equal(markiert.length, 1);
-  assert.equal(markiert[0][1], '3.000,00', 'nächste Zeile zu 3.100 € ist 3.000 €');
+  assert.equal(markiert[0][1], '3.000,00', '3.100 € liegen im Band ab 3.000 €');
   assert.equal((html.match(/<th class="r treffer">Klasse III<\/th>/g) ?? []).length, 1);
 });
 

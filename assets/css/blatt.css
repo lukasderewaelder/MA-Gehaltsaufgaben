@@ -113,3 +113,4 @@
 .page-bei { gap: 6px; font-size: 13px; line-height: 1.35; }
 .page-bei h3 { margin: 6px 0 0; }
 .page-bei .mz td, .page-bei .mz th { padding: 2px 7px; }
+.page-bei .mz.lst td, .page-bei .mz.lst th { padding: 0 6px; font-size: 11px; line-height: 1.2; }

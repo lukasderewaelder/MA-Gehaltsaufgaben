@@ -32,6 +32,8 @@ export const RATES = {
     soliMilderung: 1190,
     soliFreigrenze: 20350, // Jahressteuer, Einzelveranlagung (Splitting: doppelt)
     kistSatz: { 8: 800, 9: 900 },
+    // Programmablaufplan Lohnsteuer 2026 (Anlage 1): Grenzen Klasse V/VI, Vorsorgepauschale (Jahreswerte in Euro)
+    pap: { w1: 14071, w2: 34939, w3: 222260, bbgRvAlv: 101400, bbgKvPv: 69750, kvSatzVsp: 700, vspHoechstbetrag: 1900 },
   },
 };
 

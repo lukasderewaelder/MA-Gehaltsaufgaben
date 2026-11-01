@@ -120,16 +120,16 @@ test('Beiblatt mit festem Steuersatz: Erklärungen, Rechenbeispiele, kleine Satz
   for (const abschnitt of ['1 · Brutto und Netto', '2 · Sozialabgaben', '3 · Steuern', '4 · So kommt das Netto heraus']) assert.ok(arbeit.includes(abschnitt), abschnitt);
   assert.match(arbeit, /Netto = Brutto − Steuern − Sozialabgaben/);
   assert.match(arbeit, /Lohnsteuer = Brutto · Steuersatz/);
-  assert.match(arbeit, /2\.000 € · 15 % = <b>300,00 €<\/b>/);
+  assert.match(arbeit, /2\.000 € · 5,3 % = <b>106,00 €<\/b>/, 'Beispiel mit einem Satz aus der Tabelle');
   assert.match(arbeit, /2\.000 € · 9,3 % = <b>186,00 €<\/b>/, 'Beispiel mit dem echten Satz der Rentenversicherung');
   assert.match(arbeit, /Arzt und Krankenhaus/);
   assert.match(arbeit, /Obergrenze/);
   assert.match(arbeit, /Kirchensteuer:<\/b> Nur wer in der Kirche ist/);
-  // kleine Tabelle: 8 Brutto-Zeilen, 6 Steuerklassen, Prozentwerte
+  // kleine Tabelle: 16 Brutto-Bänder, 6 Steuerklassen, Prozentwerte mit einer Nachkommastelle
   const tabelle = arbeit.slice(arbeit.indexOf('Steuersatz nach Brutto und Steuerklasse'));
-  assert.equal((tabelle.match(/<tr><td>[\d.,]+ €<\/td>/g) ?? []).length, 8);
+  assert.equal((tabelle.match(/<tr><td>[\d.,]+ € bis unter [\d.,]+ €<\/td>/g) ?? []).length, 16);
   assert.equal((tabelle.match(/<th class="r">Klasse /g) ?? []).length, 6);
-  assert.match(tabelle, /<td class="r">\d+ %<\/td>/);
+  assert.match(tabelle, /<td class="r">\d+,\d %<\/td>/);
   assert.ok(!arbeit.includes('treffer'));
   assert.ok((loesung.match(/treffer/g) ?? []).length >= 7, 'Spalte der Steuerklasse und Zeile sind markiert');
   // Sehr einfach: keine Obergrenze, kein Soli

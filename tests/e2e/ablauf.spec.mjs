@@ -29,16 +29,20 @@ test('Zettel aus Szenario anlegen, ändern, speichern und nach dem Neuladen wied
   await page.fill('[data-bind="posten.0.faktor"]', '3000,00');
   assert.equal(await wert(page, 'gesamtBrutto'), '3.000,00');
   assert.notEqual(await wert(page, 'auszahlung'), alt);
-  // Standard ist ein fester Steuersatz: die Steuerklasse ändert die Steuer erst, wenn der Satz aus der Tabelle übernommen wird
+  // Standard ist ein fester Steuersatz: nur Werte der Tabelle, der Satz folgt der Spalte der Steuerklasse
   assert.equal(await page.inputValue('[data-bind="steuer.modus"]'), 'prozent');
-  assert.match(await page.textContent('.satz-vorschlag'), /Vorschlag laut Tabelle/);
+  assert.match(await page.textContent('.satz-vorschlag'), /Laut Tabelle \(Klasse 1, 3\.000,00 bis unter 3\.250,00 € brutto\): 10,3 %/);
+  const erlaubt = await page.locator('[data-bind="steuer.prozent"] option').allTextContents();
+  assert.ok(erlaubt.includes('10,3 %') && !erlaubt.includes('10 %') && !erlaubt.includes('9 %'), 'keine Zwischenwerte wie 9 %');
   await page.selectOption('[data-bind="person.steuerklasse"]', '3');
-  await page.click('[data-action="satz-tabelle"]');
   const kl3 = await wert(page, 'lst');
+  assert.equal(await page.inputValue('[data-bind="steuer.prozent"]'), '170', 'Klasse III: Satz laut Tabelle (1,7 %)');
   await page.selectOption('[data-bind="person.steuerklasse"]', '5');
-  assert.equal(await wert(page, 'lst'), kl3, 'fester Satz: die Steuerklasse allein ändert nichts');
-  await page.click('[data-action="satz-tabelle"]');
   assert.notEqual(await wert(page, 'lst'), kl3, 'neuer Satz aus der Tabelle für Steuerklasse V');
+  await page.selectOption('[data-bind="steuer.prozent"]', '2390');
+  assert.equal(await page.inputValue('[data-bind="steuer.prozent"]'), '2390', 'ein anderer Tabellenwert lässt sich wählen');
+  await page.click('[data-action="satz-tabelle"]');
+  assert.equal(await page.inputValue('[data-bind="steuer.prozent"]'), '2120', 'Satz aus Tabelle übernehmen: 21,2 % für 3.000 € in Klasse V');
   await page.selectOption('[data-bind="steuer.modus"]', 'tabelle');
   const tabelle5 = await wert(page, 'lst');
   await page.selectOption('[data-bind="person.steuerklasse"]', '3');
@@ -419,7 +423,7 @@ test('Sehr einfach: Felder entfallen, Beiblatt erklärt mit kleiner Satz-Tabelle
   const text = await bei.textContent();
   for (const abschnitt of ['1 · Brutto und Netto', '2 · Sozialabgaben', '3 · Steuern', '4 · So kommt das Netto heraus', 'Steuersatz nach Brutto und Steuerklasse']) assert.ok(text.includes(abschnitt), abschnitt);
   assert.doesNotMatch(text, /Obergrenze|Solidarit/);
-  assert.equal(await bei.locator('.mz.lst tbody tr').count(), 8);
+  assert.equal(await bei.locator('.mz.lst tbody tr').count(), 16);
   assert.equal(await page.locator('#pages-host .page.is-overflow').count(), 0);
   const aufgaben = await page.locator('#pages-host .aufgabe, #pages-host .teil .tt').allTextContents();
   assert.ok(aufgaben.length >= 5 && aufgaben.every((t) => !t.includes('KV-Brutto')));
@@ -428,7 +432,7 @@ test('Sehr einfach: Felder entfallen, Beiblatt erklärt mit kleiner Satz-Tabelle
   await bereich(page, 'Lohnsteuer');
   await page.click('#pages-host .val[data-feld="lst"]'); // Lohnsteuer als gesucht markieren
   const imText = await page.locator('#pages-host .teil .tt', { hasText: 'Lohnsteuer' }).first().textContent();
-  assert.match(imText, /Der Steuersatz ist \d+ %\. Rechne \d+ % vom Brutto\./);
+  assert.match(imText, /Der Steuersatz ist \d+,\d %\. Rechne \d+,\d % vom Brutto\./);
   await page.check('[data-bind="aufgabe.satzAblesen"]');
   const ablesen = await page.locator('#pages-host .teil .tt', { hasText: 'Steuersatz' }).first().textContent();
   assert.match(ablesen, /Tabelle auf dem Beiblatt/);

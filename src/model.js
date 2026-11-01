@@ -2,7 +2,7 @@
 // Beträge in Cent, Mengen in Hundertsteln (104 Std = 10400), Prozentsätze in Basispunkten (25 % = 2500).
 
 import { ratesFor } from './calc/rates.js';
-import { effektiverSatz } from './calc/tax.js';
+import { effektiverSatz, naechsterSatz } from './calc/tax.js';
 
 export const SCHEMA = 1;
 export const MONATE = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
@@ -178,7 +178,7 @@ export function normalizeFall(raw) {
   const steuer = raw.steuer ?? {};
   const posten = Array.isArray(raw.posten) ? raw.posten : [];
   const now = Date.now();
-  return {
+  const fall = {
     schema: SCHEMA,
     id: raw.id,
     titel: str(raw.titel, 'Zettel'),
@@ -242,6 +242,9 @@ export function normalizeFall(raw) {
     createdAt: num(raw.createdAt, now),
     updatedAt: num(raw.updatedAt, now),
   };
+  // Ein fester Steuersatz ist immer ein Wert der Steuersatz-Tabelle (Spalte der Steuerklasse), nie ein Zwischenwert
+  if (fall.steuer.modus === 'prozent') fall.steuer.prozent = naechsterSatz(fall.steuer.prozent, fall.person.steuerklasse, ratesFor(fall.jahr));
+  return fall;
 }
 
 export function duplicateFall(fall) {

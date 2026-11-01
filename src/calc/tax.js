@@ -1,25 +1,10 @@
-// Lohnsteuer, Solidaritätszuschlag und Kirchensteuer – bewusst vereinfacht, aber nach dem echten Tarif (§ 32a EStG).
-// Die amtliche Lohnsteuertabelle rechnet genauer (z. B. Vorsorgepauschale); die Abweichung beträgt meist wenige Euro.
+// Lohnsteuer, Solidaritätszuschlag und Kirchensteuer. Die Lohnsteuertabelle und die Steuersatz-Tabelle rechnen nach dem
+// amtlichen Programmablaufplan (pap2026.js); der Modus „Formel“ bleibt eine vereinfachte Rechnung nach dem Tarif (§ 32a EStG).
 import { bpOf, mul } from './money.js';
+import { monatsLohnsteuerPap } from './pap2026.js';
+import { einkommensteuer } from './tarif.js';
 
-const floorEps = (x) => Math.floor(x + 1e-9);
-
-/** Tarifliche Einkommenssteuer für ein zu versteuerndes Einkommen (ganze Euro) – Ergebnis in ganzen Euro. */
-export function einkommensteuer(zvE, rates) {
-  const x = Math.max(0, Math.floor(zvE));
-  const t = rates.tarif;
-  if (x <= rates.grundfreibetrag) return 0;
-  if (x <= rates.zone2Ende) {
-    const y = (x - rates.grundfreibetrag) / 10000;
-    return floorEps((t.a2 * y + 1400) * y);
-  }
-  if (x <= rates.zone3Ende) {
-    const z = (x - rates.zone2Ende) / 10000;
-    return floorEps((t.a3 * z + 2397) * z + t.c3);
-  }
-  if (x <= rates.zone4Ende) return floorEps(t.s4 * x - t.k4);
-  return floorEps(t.s5 * x - t.k5);
-}
+export { einkommensteuer };
 
 /** Jahreslohnsteuer (Euro) aus dem zu versteuernden Einkommen je nach Steuerklasse. */
 export function jahresLohnsteuer(zvE, klasse, rates) {
@@ -65,13 +50,6 @@ export function soliJahr(steuerEuro, klasse, rates) {
   return Math.min(voll, mild);
 }
 
-/** Standard-Vorsorgepauschale (Euro im Jahr), unabhängig von der Person – für die Lohnsteuertabelle. */
-function standardVorsorgeJahr(bruttoMonat, rates) {
-  const rv = bpOf(Math.min(bruttoMonat, rates.bbgRv), rates.rv);
-  const kv = bpOf(Math.min(bruttoMonat, rates.bbgKv), rates.kvAllgemein + rates.kvZusatzDurchschnitt / 2 + rates.pv);
-  return Math.floor(((rv + kv) * 12) / 100);
-}
-
 /** Lohnsteuer je Monat aus der „Tabelle“: Brutto wird in Stufen (Standard 50 €) zusammengefasst, Mitte der Stufe zählt. */
 export function tabellenStufe(bruttoCent, stufe = 5000) {
   const von = Math.floor(bruttoCent / stufe) * stufe;
@@ -80,28 +58,57 @@ export function tabellenStufe(bruttoCent, stufe = 5000) {
 
 export function tabellenLohnsteuer(bruttoCent, klasse, rates, stufe = 5000) {
   const s = tabellenStufe(bruttoCent, stufe);
-  const jahr = Math.floor((s.mitte * 12) / 100);
-  const zvE = zuVersteuern(jahr, standardVorsorgeJahr(s.mitte, rates), klasse, rates);
-  return { ...s, lohnsteuer: mul(jahresLohnsteuer(zvE, klasse, rates) * 100, 1, 12) };
+  return { ...s, lohnsteuer: monatsLohnsteuerPap(s.mitte, klasse, rates) };
+}
+
+/** Bänder der kleinen Steuersatz-Tabelle (Brutto im Monat in Cent): von … bis unter …, je 250 €. */
+export const SATZ_VON = 150000;
+export const SATZ_BIS = 550000;
+export const SATZ_BREITE = 25000;
+const BAENDER = (SATZ_BIS - SATZ_VON) / SATZ_BREITE;
+
+/** Band zu einem Brutto: darunter und darüber gilt das Randband. */
+export function satzBand(bruttoCent) {
+  const i = Math.min(BAENDER - 1, Math.max(0, Math.floor((bruttoCent - SATZ_VON) / SATZ_BREITE)));
+  const von = SATZ_VON + i * SATZ_BREITE;
+  return { index: i, von, bis: von + SATZ_BREITE, mitte: von + SATZ_BREITE / 2 };
 }
 
 /**
- * Durchschnittlicher Steuersatz (Lohnsteuer : Brutto) für ein Monatsbrutto und eine Steuerklasse, auf ganze Prozent gerundet,
- * in Basispunkten (14 % = 1400). Grundlage ist dieselbe vereinfachte Tabelle wie bei der Lohnsteuertabelle.
+ * Steuersatz (Lohnsteuer : Brutto) eines Bands und einer Steuerklasse in Basispunkten, auf 0,1 % gerundet (8,3 % = 830).
+ * Die Lohnsteuer kommt aus dem amtlichen Programmablaufplan, gerechnet für die Mitte des Bands.
  */
-export function effektiverSatz(bruttoCent, klasse, rates) {
-  if (bruttoCent <= 0) return 0;
-  const zeile = tabellenLohnsteuer(bruttoCent, klasse, rates);
-  return Math.round((zeile.lohnsteuer * 100) / zeile.mitte) * 100;
+export function bandSatz(band, klasse, rates) {
+  const lst = monatsLohnsteuerPap(band.mitte, klasse, rates);
+  return Math.round((lst * 10000) / band.mitte / 10) * 10;
 }
 
-/** Brutto-Stufen (Cent) der kleinen Steuersatz-Tabelle auf dem Beiblatt. */
-export const SATZ_BRUTTO = [150000, 200000, 250000, 300000, 350000, 400000, 450000, 500000];
+/** Steuersatz in Basispunkten für ein Monatsbrutto und eine Steuerklasse: der Wert des passenden Bands der Tabelle. */
+export function effektiverSatz(bruttoCent, klasse, rates) {
+  if (bruttoCent <= 0) return 0;
+  return bandSatz(satzBand(bruttoCent), klasse, rates);
+}
 
-/** Kleine Tabelle: für jedes Brutto die Steuersätze (Basispunkte) der Steuerklassen I bis VI. */
+/** Kleine Tabelle: für jedes Band die Steuersätze (Basispunkte) der Steuerklassen I bis VI. */
 export function satzTabelle(rates) {
   const klassen = [1, 2, 3, 4, 5, 6];
-  return { klassen, zeilen: SATZ_BRUTTO.map((brutto) => ({ brutto, saetze: klassen.map((k) => effektiverSatz(brutto, k, rates)) })) };
+  const zeilen = Array.from({ length: BAENDER }, (_, i) => {
+    const band = satzBand(SATZ_VON + i * SATZ_BREITE);
+    return { von: band.von, bis: band.bis, saetze: klassen.map((k) => bandSatz(band, k, rates)) };
+  });
+  return { klassen, zeilen };
+}
+
+/** Alle Sätze, die in der Spalte einer Steuerklasse vorkommen (aufsteigend, ohne Doppelte). Nur diese sind im Zettel möglich. */
+export function erlaubteSaetze(klasse, rates) {
+  const t = satzTabelle(rates);
+  const i = t.klassen.indexOf(klasse);
+  return [...new Set(t.zeilen.map((z) => z.saetze[i < 0 ? 0 : i]))].sort((a, b) => a - b);
+}
+
+/** Der erlaubte Satz einer Steuerklasse, der einem beliebigen Satz am nächsten liegt (bei Gleichstand der kleinere). */
+export function naechsterSatz(bp, klasse, rates) {
+  return erlaubteSaetze(klasse, rates).reduce((a, b) => (Math.abs(b - bp) < Math.abs(a - bp) ? b : a));
 }
 
 /**

@@ -106,8 +106,9 @@ test('Gehaltszettel 3.000 €, Klasse I, nach Tarif (von Hand nachgerechnet)', (
 test('Kirchensteuer und Prozentmodus', () => {
   const kirche = berechne(gehaltFall({ person: { ...gehaltFall().person, konfession: 'ev' } }));
   assert.equal(kirche.kist, 2616); // 9 % von 3488 € / 12
-  const prozent = berechne(gehaltFall({ steuer: { modus: 'prozent', prozent: 1500, soli: false } }));
-  assert.equal(prozent.lst, 45000);
+  const prozent = berechne(gehaltFall({ steuer: { modus: 'prozent', prozent: 1480, soli: false } }));
+  assert.equal(prozent.lst, 44400); // 14,8 % von 3.000 €
+  assert.equal(gehaltFall({ steuer: { modus: 'prozent', prozent: 1500, soli: false } }).steuer.prozent, 1480, '15 % steht in Klasse I nicht in der Tabelle');
   assert.equal(prozent.soli, 0);
 });
 
