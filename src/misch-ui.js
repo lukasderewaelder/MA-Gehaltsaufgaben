@@ -18,7 +18,7 @@ import { INTRO_AUTO, paginiere, renderMisch } from './mischsheet.js';
 import { MONATE } from './model.js';
 import { esc } from './slip.js';
 import { $, toast } from './ui.js';
-import { PAGE_W, fitPages, sachtextAuto, teilaufgaben } from './worksheet.js';
+import { fitPages, ganzeSeiteZoom, sachtextAuto, teilaufgaben } from './worksheet.js';
 import { rueckPlan } from './rueck.js';
 
 const typOptionen = (wert) => ALLE_TYPEN.map((t) => `<option value="${t}"${t === wert ? ' selected' : ''}>${esc(MISCH_TYPEN[t].label)}</option>`).join('');
@@ -134,6 +134,7 @@ export function createMischDialog(app) {
 export function createMischEditor(app) {
   const root = $('#view-misch');
   const form = $('#mi-form');
+  const links = $('#mi-links');
   const pages = $('#mi-pages');
   const tabs = [...root.querySelectorAll('[data-mpane]')];
   let blatt = null;
@@ -155,8 +156,7 @@ export function createMischEditor(app) {
     fit();
   }
   function fit() {
-    const avail = $('#mi-preview').clientWidth - 24;
-    pages.style.zoom = String(Math.min(1.3, Math.max(0.3, avail / PAGE_W)));
+    pages.style.zoom = String(ganzeSeiteZoom($('#mi-preview'), pages));
   }
   window.addEventListener('resize', () => blatt && fit());
 
@@ -167,7 +167,6 @@ export function createMischEditor(app) {
   }
 
   function renderForm() {
-    const offen = new Map([...form.querySelectorAll('details')].map((d) => [d.querySelector('summary').textContent, d.open]));
     const n = blatt.aufgaben.length;
     const karten = blatt.aufgaben
       .map((a, i) => {
@@ -190,27 +189,18 @@ export function createMischEditor(app) {
         </fieldset>`;
       })
       .join('');
-    form.innerHTML = `
-      <details open><summary>Blatt</summary>
-        <label class="f"><span>Titel</span><input data-m="titel" value="${esc(blatt.titel)}"></label>
-        <label class="f"><span>Einleitung (leer = automatisch)</span><textarea data-m="intro" rows="2" placeholder="${esc(INTRO_AUTO)}">${esc(blatt.intro)}</textarea></label>
-        <div class="row">
-          <label class="f"><span>Rechenzeilen je Teilaufgabe</span><select data-m="zeilen">${[0, 1, 2, 3, 4, 5].map((z) => `<option value="${z}"${z === blatt.zeilen ? ' selected' : ''}>${z}</option>`).join('')}</select></label>
-        </div>
-        <label class="f f-check"><input type="checkbox" data-m="beiblatt"${blatt.beiblatt ? ' checked' : ''}><span>Beiblatt „Abzüge im Überblick“ mitliefern</span></label>
-      </details>
-      <details open><summary>Aufgaben (${n})</summary>
-        ${karten || '<p class="muted">Noch keine Aufgaben.</p>'}
-        <div class="row add-row">
-          <select id="mi-neu-typ" aria-label="Art der neuen Aufgabe">${typOptionen('netto')}</select>
-          <button type="button" class="btn" data-m="add"${n >= MAX_AUFGABEN ? ' disabled' : ''}>Aufgabe hinzufügen</button>
-        </div>
-        ${n >= MAX_AUFGABEN ? `<p class="muted">Mehr als ${MAX_AUFGABEN} Aufgaben sind nicht möglich.</p>` : ''}
-      </details>`;
-    form.querySelectorAll('details').forEach((d) => {
-      const key = d.querySelector('summary').textContent;
-      if (offen.has(key)) d.open = offen.get(key);
-    });
+    links.innerHTML = `<h2 class="links-titel">Blatt</h2>
+      <label class="f"><span>Titel</span><input data-m="titel" value="${esc(blatt.titel)}"></label>
+      <label class="f"><span>Einleitung (leer = automatisch)</span><textarea data-m="intro" rows="3" placeholder="${esc(INTRO_AUTO)}">${esc(blatt.intro)}</textarea></label>
+      <label class="f"><span>Rechenzeilen je Teilaufgabe</span><select data-m="zeilen">${[0, 1, 2, 3, 4, 5].map((z) => `<option value="${z}"${z === blatt.zeilen ? ' selected' : ''}>${z}</option>`).join('')}</select></label>
+      <label class="f f-check"><input type="checkbox" data-m="beiblatt"${blatt.beiblatt ? ' checked' : ''}><span>Beiblatt mitliefern</span></label>`;
+    form.innerHTML = `<h2 class="links-titel">Aufgaben (${n})</h2>
+      <div class="raster">${karten || '<p class="muted">Noch keine Aufgaben.</p>'}</div>
+      <div class="row add-row">
+        <select id="mi-neu-typ" aria-label="Art der neuen Aufgabe">${typOptionen('netto')}</select>
+        <button type="button" class="btn btn-small" data-m="add"${n >= MAX_AUFGABEN ? ' disabled' : ''}>Aufgabe hinzufügen</button>
+      </div>
+      ${n >= MAX_AUFGABEN ? `<p class="muted">Mehr als ${MAX_AUFGABEN} Aufgaben sind nicht möglich.</p>` : ''}`;
   }
 
   // --- Speichern --------------------------------------------------------------------------------------
@@ -252,7 +242,8 @@ export function createMischEditor(app) {
   };
 
   // --- Eingaben -----------------------------------------------------------------------------------------
-  form.addEventListener('input', (e) => {
+  const aufFormular = (art, fn) => [form, links].forEach((h) => h.addEventListener(art, fn));
+  aufFormular('input', (e) => {
     const el = e.target.closest('[data-m]');
     if (!el || el.tagName === 'SELECT' || el.type === 'checkbox') return;
     const m = el.dataset.m;
@@ -264,7 +255,7 @@ export function createMischEditor(app) {
     else return;
     geaendert();
   });
-  form.addEventListener('change', (e) => {
+  aufFormular('change', (e) => {
     const el = e.target.closest('[data-m]');
     if (!el) return;
     const m = el.dataset.m;
@@ -332,7 +323,7 @@ export function createMischEditor(app) {
   });
   $('#mi-titel').addEventListener('input', (e) => {
     blatt.titel = e.target.value;
-    const feld = form.querySelector('[data-m="titel"]');
+    const feld = links.querySelector('[data-m="titel"]');
     if (feld) feld.value = e.target.value;
     geaendert();
   });

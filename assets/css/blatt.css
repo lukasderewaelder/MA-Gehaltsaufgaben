@@ -100,8 +100,8 @@
 .page-misch { gap: 12px; }
 
 /* Ansicht im Editor */
-.pane-bar { display: flex; gap: 6px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
-.pane-bar [role='tab'] { font: inherit; min-height: 40px; padding: 0 14px; border: 1px solid var(--line); border-radius: 10px; background: #fff; cursor: pointer; }
+.pane-bar { display: flex; gap: 4px; align-items: center; margin-bottom: 4px; flex-wrap: wrap; }
+.pane-bar [role='tab'] { font: inherit; font-size: 0.85rem; min-height: 34px; padding: 0 9px; border: 1px solid var(--line); border-radius: 10px; background: #fff; cursor: pointer; }
 .pane-bar [role='tab'][aria-selected='true'] { background: var(--blue); border-color: var(--blue); color: #fff; }
 #view-editor[data-pane='zettel'] #pages-host,
 #view-editor:not([data-pane='zettel']) #slip-host { display: none; }
@@ -110,7 +110,7 @@
 /* Beiblatt „Was wird abgezogen?“ */
 .formel { background: #eef2ff; border-left: 4px solid #2563eb; padding: 3px 10px; font-weight: 700; margin: 2px 0; }
 .schritte { margin: 0; padding-left: 22px; }
-.page-bei { gap: 6px; font-size: 13px; line-height: 1.35; }
-.page-bei h3 { margin: 6px 0 0; }
-.page-bei .mz td, .page-bei .mz th { padding: 2px 7px; }
+.page-bei { gap: 4px; font-size: 12px; line-height: 1.3; padding-top: 30px; padding-bottom: 28px; }
+.page-bei h3 { margin: 3px 0 0; font-size: 14px; }
+.page-bei .mz td, .page-bei .mz th { padding: 1px 6px; font-size: 12px; }
 .page-bei .mz.lst td, .page-bei .mz.lst th { padding: 0 6px; font-size: 11px; line-height: 1.2; }

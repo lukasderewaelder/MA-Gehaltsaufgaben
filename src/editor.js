@@ -8,18 +8,15 @@ import { erzeugeFall, randomSeed } from './generators/faelle.js';
 import { BEITRAEGE, RUECK_TYPEN, STUNDEN_ARTEN, rueckPlan } from './rueck.js';
 import { esc, feldName, renderSlip } from './slip.js';
 import { $, toast } from './ui.js';
-import { PAGE_W, fitPages, gesuchteFelder, sachtextAuto, teilText, teilaufgaben, verfuegbareFelder } from './worksheet.js';
+import { fitPages, ganzeSeiteZoom, gesuchteFelder, sachtextAuto, teilText, teilaufgaben, verfuegbareFelder } from './worksheet.js';
 import { renderSeiten } from './yearsheet.js';
 
-const SLIP_WIDTH = PAGE_W; // A4 bei 96 dpi
-const MAX_ZOOM = 1.3; // auf breiten Bildschirmen darf die Vorschau etwas größer werden
-
 const PANE_HINWEIS = {
-  zettel: 'Auf einen Wert im Zettel tippen, um ihn von Hand zu ändern und den Rechenweg zu sehen.',
-  arbeit: 'Auf einen Wert tippen: gesucht (bleibt leer) oder angegeben. Leere Linien sind die gesuchten Werte.',
-  loesung: 'Grün hinterlegt sind die gesuchten Werte. Auf einen Wert tippen schaltet „gesucht“ um.',
-  'jahr-arbeit': 'Jahresübersicht als Aufgabe: Welche Teile Lücken sind, stellst du rechts im Schritt „Jahr“ ein.',
-  'jahr-loesung': 'Jahresübersicht mit Lösung: Grün hinterlegt sind die Werte, die im Aufgabenblatt fehlen.',
+  zettel: 'Wert antippen: von Hand ändern und Rechenweg sehen.',
+  arbeit: 'Wert antippen: gesucht (bleibt leer) oder angegeben.',
+  loesung: 'Grün sind die gesuchten Werte. Antippen schaltet um.',
+  'jahr-arbeit': 'Welche Teile Lücken sind, stellst du rechts unter „Jahr“ ein.',
+  'jahr-loesung': 'Grün sind die Werte, die im Aufgabenblatt fehlen.',
 };
 
 const getAt = (obj, path) => path.split('.').reduce((a, k) => a?.[k], obj);
@@ -50,25 +47,51 @@ const select = (label, path, options, fall, kind = 'text') =>
 const check = (label, path, fall) =>
   `<label class="f f-check"><input type="checkbox" data-bind="${path}" data-kind="bool"${getAt(fall, path) ? ' checked' : ''}><span>${label}</span></label>`;
 
-function postenForm(fall, p, i) {
+/** Eingabefeld für eine Tabellenzelle: ohne sichtbare Beschriftung, der Name steht in `aria-label`. */
+const zelle = (label, path, kind, fall) =>
+  `<td><input aria-label="${esc(label)}" data-bind="${path}" data-kind="${kind}" value="${esc(FORMAT[kind](getAt(fall, path)))}"${kind === 'text' ? '' : ' inputmode="decimal"'}></td>`;
+
+/** Ein Posten als Tabellenzeile; Lohnart, Steuer und Sozialversicherung stehen in einer aufklappbaren zweiten Zeile. */
+function postenZeile(fall, r, p, i, offen) {
   const art = POSTEN_TYPEN[p.typ]?.art ?? 'pauschal';
   const base = `posten.${i}`;
-  const typen = Object.entries(POSTEN_TYPEN).map(([k, d]) => [k, d.label]);
-  return `<fieldset class="posten" data-index="${i}">
-    <legend>${esc(p.bezeichnung || 'Posten')} <button type="button" class="btn-x" data-action="del-posten" data-index="${i}" aria-label="Posten ${esc(p.bezeichnung)} entfernen">✕</button></legend>
-    <label class="f"><span>Art</span><select data-action="typ" data-index="${i}">${typen
-      .map(([k, t]) => `<option value="${k}"${k === p.typ ? ' selected' : ''}>${esc(t)}</option>`)
-      .join('')}</select></label>
-    <div class="row">${input('Lohnart', `${base}.lohnart`, 'text', fall)}${input('Bezeichnung', `${base}.bezeichnung`, 'text', fall)}</div>
-    <div class="row">
-      ${art === 'pauschal' ? input('Betrag (€)', `${base}.faktor`, 'money', fall) : `${input(`Menge (${esc(p.einheit)})`, `${base}.menge`, 'hund', fall)}${input(art === 'zuschlag' ? 'Stundenlohn (€)' : 'je Einheit (€)', `${base}.faktor`, 'money', fall)}`}
-      ${art === 'zuschlag' ? input('Prozent (%)', `${base}.prozent`, 'bp', fall) : ''}
-    </div>
-    <div class="row">
-      ${select('Steuer', `${base}.st`, [['L', 'L – laufend'], ['S', 'S – sonstiger Bezug'], ['F', 'F – steuerfrei']], fall)}
-      ${select('Sozialvers.', `${base}.sv`, [['L', 'L – laufend'], ['S', 'S – einmalig'], ['F', 'F – frei']], fall)}
-    </div>
-  </fieldset>`;
+  const name = esc(p.bezeichnung || 'Posten');
+  const typen = Object.entries(POSTEN_TYPEN)
+    .map(([k, d]) => `<option value="${k}"${k === p.typ ? ' selected' : ''}>${esc(d.label)}</option>`)
+    .join('');
+  return `<tr data-index="${i}">
+      <td><select aria-label="Art von ${name}" data-action="typ" data-index="${i}">${typen}</select></td>
+      ${zelle(`Bezeichnung von ${name}`, `${base}.bezeichnung`, 'text', fall)}
+      ${art === 'pauschal' ? '<td></td>' : zelle(`Menge von ${name} (${p.einheit})`, `${base}.menge`, 'hund', fall)}
+      ${zelle(art === 'pauschal' ? `Betrag von ${name}` : `Preis je Einheit von ${name}`, `${base}.faktor`, 'money', fall)}
+      ${art === 'zuschlag' ? zelle(`Prozent von ${name}`, `${base}.prozent`, 'bp', fall) : '<td></td>'}
+      <td class="p-betrag"><output data-betrag="p:${esc(p.id)}">${fmtCents(r.werte[`p:${p.id}`] ?? 0)}</output></td>
+      <td class="p-tasten">
+        <button type="button" class="btn-x" data-action="posten-mehr" data-id="${esc(p.id)}" aria-expanded="${offen}" aria-label="Weitere Angaben zu ${name}">${offen ? '▴' : '▾'}</button>
+        <button type="button" class="btn-x" data-action="del-posten" data-index="${i}" aria-label="Posten ${name} entfernen">✕</button>
+      </td>
+    </tr>
+    ${
+      offen
+        ? `<tr class="p-mehr"><td colspan="7"><div class="row">
+        ${input('Lohnart', `${base}.lohnart`, 'text', fall)}
+        ${select('Steuer', `${base}.st`, [['L', 'L – laufend'], ['S', 'S – sonstiger Bezug'], ['F', 'F – steuerfrei']], fall)}
+        ${select('Sozialvers.', `${base}.sv`, [['L', 'L – laufend'], ['S', 'S – einmalig'], ['F', 'F – frei']], fall)}
+      </div></td></tr>`
+        : ''
+    }`;
+}
+
+function postenTabelle(fall, r, offen) {
+  const zeilen = fall.posten.map((p, i) => postenZeile(fall, r, p, i, offen.has(p.id))).join('');
+  return `<table class="posten-tab">
+      <thead><tr><th>Art</th><th>Bezeichnung</th><th>Menge</th><th>Preis/Betrag (€)</th><th>%</th><th class="r">Summe (€)</th><th></th></tr></thead>
+      <tbody>${zeilen || '<tr><td colspan="7" class="muted">Noch keine Posten.</td></tr>'}</tbody>
+    </table>
+    <div class="row add-row">
+      <select id="posten-neu" aria-label="Neuer Posten">${Object.entries(POSTEN_TYPEN).map(([k, d]) => `<option value="${k}">${esc(d.label)}</option>`).join('')}</select>
+      <button type="button" class="btn btn-small" data-action="add-posten">Posten hinzufügen</button>
+    </div>`;
 }
 
 function rueckForm(fall, plan) {
@@ -106,21 +129,19 @@ function aufgabeForm(fall, r) {
       (t, i) => `<label class="f"><span>${esc(t.nr)} ${esc(feldName(t.id, fall))}</span><input data-action="teiltext" data-id="${esc(t.id)}" value="${esc(a.texte[t.id] ?? '')}" placeholder="${esc(teilText(fall, r, t.id, i))}"></label>`,
     )
     .join('');
-  return `<details open><summary>Arbeitsblatt</summary>
-    ${rueckForm(fall, plan)}
-    ${select('Blattart', 'aufgabe.blatt', [['aufgabe', 'Aufgabenblatt mit Zettel'], ['zettel', 'Nur der Zettel']], fall)}
-    <div class="row">${input('Überschrift', 'aufgabe.titel', 'text', fall, `placeholder="${esc(fall.titel)}"`)}${select('Rechenzeilen', 'aufgabe.zeilen', [0, 1, 2, 3, 4, 5].map((n) => [n, n]), fall, 'int')}</div>
-    ${check('Beiblatt „Abzüge im Überblick“ mitliefern', 'aufgabe.beiblatt', fall)}
-  </details>
-  <details open><summary>Gesuchte Werte</summary>
-    <p class="muted">${plan ? 'Bei Rückwärtsaufgaben sind die Lücken fest vorgegeben.' : 'Diese Werte bleiben auf dem Arbeitsblatt leer. Man kann sie auch direkt im Arbeits- oder Lösungsblatt antippen.'}</p>
-    ${plan ? '' : gruppen}
-  </details>
-  <details><summary>Texte</summary>
-    <label class="f"><span>Einleitender Text</span><textarea id="sachtext" data-action="sachtext" rows="4">${esc(sach)}</textarea></label>
-    <button type="button" class="btn btn-small" data-action="sach-auto">Text automatisch erzeugen</button>
-    ${teile ? `<h3 class="zw">Texte der Teilaufgaben</h3><p class="muted">Leer lassen für den automatischen Text.</p>${teile}` : ''}
-  </details>`;
+  return `<div class="raster">
+    <section class="karte"><h3>Aufgabe</h3>
+      ${rueckForm(fall, plan)}
+      ${input('Überschrift', 'aufgabe.titel', 'text', fall, `placeholder="${esc(fall.titel)}"`)}
+      <label class="f"><span>Einleitender Text</span><textarea id="sachtext" data-action="sachtext" rows="4">${esc(sach)}</textarea></label>
+      <button type="button" class="btn btn-small" data-action="sach-auto">Text automatisch erzeugen</button>
+    </section>
+    <section class="karte karte-breit"><h3>Gesuchte Werte</h3>
+      <p class="muted">${plan ? 'Bei Rückwärtsaufgaben sind die Lücken fest vorgegeben.' : 'Diese Werte bleiben auf dem Arbeitsblatt leer. Du kannst sie auch direkt im Blatt antippen.'}</p>
+      ${plan ? '' : `<div class="gesucht">${gruppen}</div>`}
+    </section>
+    ${teile ? `<section class="karte karte-voll"><h3>Texte der Teilaufgaben</h3><p class="muted">Leer lassen für den automatischen Text.</p><div class="teil-texte">${teile}</div></section>` : ''}
+  </div>`;
 }
 
 /** Fester Steuersatz: nur Werte der Steuersatz-Tabelle (Spalte der Steuerklasse); beim Ablesen folgt der Satz dem Brutto-Band. */
@@ -142,83 +163,84 @@ function satzAuswahl(fall, r) {
 
 function jahrForm(fall) {
   const jb = fall.jahresblatt;
-  return `<details open><summary>Jahresübersicht</summary>
-    ${input('Überschrift', 'jahresblatt.titel', 'text', fall, `placeholder="Jahresübersicht ${fall.jahr}"`)}
-    <p class="muted">Diese Teile der Tabelle sind im Aufgabenblatt Lücken (Ansichten „Jahr: Aufgabe“ und „Jahr: Lösung“):</p>
-    ${check('Jahressummen', 'jahresblatt.luecken.summen', fall)}
-    ${check('Durchschnitt je Monat', 'jahresblatt.luecken.durchschnitt', fall)}
-    ${check('Anteile am Brutto in Prozent', 'jahresblatt.luecken.quoten', fall)}
-    ${check('Netto jedes Monats', 'jahresblatt.luecken.netto', fall)}
-    ${check('Diagramm anzeigen', 'jahresblatt.diagramm', fall)}
-    ${select('Vergleich', 'jahresblatt.vergleich', [['aus', 'Kein Vergleich'], ['klassen', 'Alle Steuerklassen'], ['paar', 'Ehepaar: III/V, IV/IV, V/III']], fall)}
-    ${jb.vergleich === 'paar' ? input('Gehalt Partner/in (€ je Monat)', 'jahresblatt.partner', 'money', fall) : ''}
-    <p class="muted">Sonderzahlungen gelten nur in dem Monat, der im Zettel steht. Alle anderen Monate haben das gleiche laufende Gehalt.</p>
-  </details>`;
+  return `<div class="raster">
+    <section class="karte"><h3>Lücken im Aufgabenblatt</h3>
+      <p class="muted">Diese Teile der Tabelle bleiben leer (Ansichten „Jahr: Aufgabe“ und „Jahr: Lösung“):</p>
+      ${check('Jahressummen', 'jahresblatt.luecken.summen', fall)}
+      ${check('Durchschnitt je Monat', 'jahresblatt.luecken.durchschnitt', fall)}
+      ${check('Anteile am Brutto in Prozent', 'jahresblatt.luecken.quoten', fall)}
+      ${check('Netto jedes Monats', 'jahresblatt.luecken.netto', fall)}
+    </section>
+    <section class="karte"><h3>Jahresübersicht</h3>
+      ${input('Überschrift', 'jahresblatt.titel', 'text', fall, `placeholder="Jahresübersicht ${fall.jahr}"`)}
+      ${check('Diagramm anzeigen', 'jahresblatt.diagramm', fall)}
+      ${select('Vergleich', 'jahresblatt.vergleich', [['aus', 'Kein Vergleich'], ['klassen', 'Alle Steuerklassen'], ['paar', 'Ehepaar: III/V, IV/IV, V/III']], fall)}
+      ${jb.vergleich === 'paar' ? input('Gehalt Partner/in (€ je Monat)', 'jahresblatt.partner', 'money', fall) : ''}
+      <p class="muted">Sonderzahlungen gelten nur in dem Monat, der im Zettel steht. Alle anderen Monate haben das gleiche laufende Gehalt.</p>
+    </section>
+  </div>`;
 }
 
-/** Schritt „Zettel“: Kopfangaben, Firma und Person, Bezüge und Abzüge, Lohnsteuer. */
-function schrittZettel(fall, r) {
+/** Reiter „Zettel“: Kopfangaben, Firma, Person, Posten, Lohnsteuer und zuschaltbare Blöcke. */
+function schrittZettel(fall, r, postenOffen) {
   const monate = MONATE.map((m, i) => [i + 1, m]);
   const jahre = YEARS.map((y) => [y, y]);
-  return `
-  <details open><summary>Zettel</summary>
-    <div class="row">${select('Art', 'art', [['gehalt', 'Gehalt'], ['lohn', 'Lohn']], fall)}${select('Monat', 'monat', monate, fall, 'int')}${select('Jahr', 'jahr', jahre, fall, 'int')}</div>
-  </details>
-  <details open><summary>Firma und Person</summary>
-    ${input('Firma', 'firma.name', 'text', fall)}
-    <div class="row">${input('Straße', 'firma.strasse', 'text', fall)}${input('Ort', 'firma.ort', 'text', fall)}</div>
-    ${input('Name', 'person.name', 'text', fall)}
-    <div class="row">${input('Straße', 'person.strasse', 'text', fall)}${input('Ort', 'person.ort', 'text', fall)}</div>
-    <div class="row">${input('Personal-Nr.', 'person.personalnr', 'text', fall)}${input('Geburtsjahr', 'person.geburtsjahr', 'int', fall)}</div>
-    <div class="row">${select('Steuerklasse', 'person.steuerklasse', [1, 2, 3, 4, 5, 6].map((k) => [k, k]), fall, 'int')}${input('Kinder', 'person.kinder', 'int', fall)}</div>
-    <div class="row">${select('Konfession', 'person.konfession', Object.entries(KONFESSIONEN), fall)}${select('Kirchensteuer', 'person.kirchensteuersatz', [[9, '9 %'], [8, '8 % (BY, BW)']], fall, 'int')}</div>
-    <div class="row">${input('Krankenkasse', 'person.krankenkasse', 'text', fall)}${input('Zusatzbeitrag (%)', 'person.zusatzbeitrag', 'bp', fall)}</div>
-    ${check('Minijob (keine Abzüge für den Arbeitnehmer)', 'person.minijob', fall)}
-  </details>
-  <details open><summary>Bezüge und Abzüge</summary>
-    <div id="posten-liste">${fall.posten.map((p, i) => postenForm(fall, p, i)).join('') || '<p class="muted">Noch keine Posten.</p>'}</div>
-    <div class="row add-row">
-      <select id="posten-neu" aria-label="Neuer Posten">${Object.entries(POSTEN_TYPEN).map(([k, d]) => `<option value="${k}">${esc(d.label)}</option>`).join('')}</select>
-      <button type="button" class="btn" data-action="add-posten">Posten hinzufügen</button>
-    </div>
-  </details>
-  <details open><summary>Lohnsteuer</summary>
-    ${select('So wird die Lohnsteuer bestimmt', 'steuer.modus', Object.entries(STEUERMODI), fall)}
-    ${
-      fall.steuer.modus === 'prozent'
-        ? `${satzAuswahl(fall, r)}
-    ${check('Die Schüler lesen den Steuersatz in der Tabelle auf dem Beiblatt ab (er steht nicht im Aufgabentext)', 'aufgabe.satzAblesen', fall)}`
-        : ''
-    }
-    ${fall.anzeige.einfach ? '' : check('Solidaritätszuschlag berechnen', 'steuer.soli', fall)}
-    <p class="muted">Im Unterricht wird ein Monat betrachtet: Standard ist ein fester Steuersatz. Tabelle und Tarif sind vereinfacht und weichen von der amtlichen Lohnsteuer um wenige Euro ab.</p>
-  </details>`;
+  return `<div class="raster">
+    <section class="karte"><h3>Firma</h3>
+      <div class="row">${select('Art', 'art', [['gehalt', 'Gehalt'], ['lohn', 'Lohn']], fall)}${select('Monat', 'monat', monate, fall, 'int')}${select('Jahr', 'jahr', jahre, fall, 'int')}</div>
+      ${input('Firma', 'firma.name', 'text', fall)}
+      <div class="row">${input('Straße', 'firma.strasse', 'text', fall)}${input('Ort', 'firma.ort', 'text', fall)}</div>
+    </section>
+    <section class="karte"><h3>Person</h3>
+      ${input('Name', 'person.name', 'text', fall)}
+      <div class="row">${input('Straße', 'person.strasse', 'text', fall)}${input('Ort', 'person.ort', 'text', fall)}</div>
+      <div class="row">${input('Personal-Nr.', 'person.personalnr', 'text', fall)}${input('Geburtsjahr', 'person.geburtsjahr', 'int', fall)}</div>
+    </section>
+    <section class="karte"><h3>Steuer und Kasse</h3>
+      <div class="row">${select('Steuerklasse', 'person.steuerklasse', [1, 2, 3, 4, 5, 6].map((k) => [k, k]), fall, 'int')}${input('Kinder', 'person.kinder', 'int', fall)}</div>
+      <div class="row">${select('Konfession', 'person.konfession', Object.entries(KONFESSIONEN), fall)}${select('Kirchensteuer', 'person.kirchensteuersatz', [[9, '9 %'], [8, '8 % (BY, BW)']], fall, 'int')}</div>
+      <div class="row">${input('Krankenkasse', 'person.krankenkasse', 'text', fall)}${input('Zusatzbeitrag (%)', 'person.zusatzbeitrag', 'bp', fall)}</div>
+    </section>
+    <section class="karte karte-voll"><h3>Bezüge und Abzüge</h3>
+      ${postenTabelle(fall, r, postenOffen)}
+    </section>
+    <section class="karte karte-breit"><h3>Lohnsteuer</h3>
+      <div class="lst-kopf">${select('So wird die Lohnsteuer bestimmt', 'steuer.modus', Object.entries(STEUERMODI), fall)}${fall.steuer.modus === 'prozent' ? satzAuswahl(fall, r) : ''}</div>
+      <div class="row">${fall.steuer.modus === 'prozent' ? check('Schüler lesen den Satz auf dem Beiblatt ab', 'aufgabe.satzAblesen', fall) : ''}${fall.anzeige.einfach ? '' : check('Solidaritätszuschlag', 'steuer.soli', fall)}</div>
+    </section>
+    <section class="karte"><h3>Weitere Blöcke</h3>
+      ${check('Minijob (keine Abzüge)', 'person.minijob', fall)}
+      ${Object.entries(BLOECKE).map(([k, t]) => check(t, `anzeige.bloecke.${k}`, fall)).join('')}
+      ${fall.anzeige.bloecke.fehltage ? `<div class="row">${input('Urlaubstage', 'fehltage.urlaub', 'int', fall)}${input('Krankheitstage', 'fehltage.krank', 'int', fall)}</div>${input('Hinweis', 'hinweis', 'text', fall)}` : ''}
+      ${fall.anzeige.bloecke.bank ? input('Bank', 'bank.name', 'text', fall) + input('IBAN', 'bank.iban', 'text', fall) : ''}
+    </section>
+  </div>`;
 }
 
-/** Schritt „Aussehen“: Optik, Detailgrad, Erklärmodus und zuschaltbare Blöcke. */
-function schrittAussehen(fall) {
-  return `
-  <details open><summary>Aussehen und weitere Blöcke</summary>
-    ${select('Optik', 'anzeige.optik', [['modern', 'Klar und modern'], ['original', 'Originalgetreu (Matrixdruck-Stil)']], fall)}
-    ${check('Sehr einfach: ohne Obergrenzen, Steuer-Brutto, KV-/RV-/AV-/PV-Brutto und Soli (alles wird vom Brutto gerechnet)', 'anzeige.einfach', fall)}
-    ${check('Erklärmodus: nummerierte Marken und Legende', 'anzeige.erklaermodus', fall)}
-    ${Object.entries(BLOECKE).map(([k, t]) => check(t, `anzeige.bloecke.${k}`, fall)).join('')}
-    ${fall.anzeige.bloecke.fehltage ? `<div class="row">${input('Urlaubstage', 'fehltage.urlaub', 'int', fall)}${input('Krankheitstage', 'fehltage.krank', 'int', fall)}</div>${input('Hinweis', 'hinweis', 'text', fall)}` : ''}
-    ${fall.anzeige.bloecke.bank ? input('Bank', 'bank.name', 'text', fall) + input('IBAN', 'bank.iban', 'text', fall) : ''}
-  </details>`;
+/** Linke Spalte: alles, was die Form bestimmt, nicht den Inhalt. */
+function darstellungForm(fall) {
+  return `<h2 class="links-titel">Darstellung</h2>
+    ${select('Optik', 'anzeige.optik', [['modern', 'Klar und modern'], ['original', 'Originalgetreu (Matrixdruck)']], fall)}
+    ${check('Sehr einfach', 'anzeige.einfach', fall)}
+    <p class="muted">Ohne Obergrenzen, Steuer-Brutto, KV-/RV-/AV-/PV-Brutto und Soli. Alles wird vom Brutto gerechnet.</p>
+    ${check('Erklärmodus', 'anzeige.erklaermodus', fall)}
+    <p class="muted">Nummerierte Marken und Legende.</p>
+    <h2 class="links-titel">Arbeitsblatt</h2>
+    ${select('Blattart', 'aufgabe.blatt', [['aufgabe', 'Aufgabenblatt mit Zettel'], ['zettel', 'Nur der Zettel']], fall)}
+    ${select('Rechenzeilen', 'aufgabe.zeilen', [0, 1, 2, 3, 4, 5].map((n) => [n, n]), fall, 'int')}
+    ${check('Beiblatt mitliefern', 'aufgabe.beiblatt', fall)}`;
 }
 
 const SCHRITTE = {
-  zettel: { name: 'Zettel', html: schrittZettel, ansichten: ['zettel', 'arbeit', 'loesung'] }, // Zettel ändern und das Ergebnis im Blatt sehen
-  aufgabe: { name: 'Aufgabe', html: aufgabeForm, ansichten: ['arbeit', 'loesung'] },
-  jahr: { name: 'Jahr', html: jahrForm, ansichten: ['jahr-arbeit', 'jahr-loesung'] },
-  aussehen: { name: 'Aussehen', html: schrittAussehen, ansichten: ['zettel', 'arbeit', 'loesung'] },
+  zettel: { html: schrittZettel, ansichten: ['zettel', 'arbeit', 'loesung'] }, // Zettel ändern und das Ergebnis im Blatt sehen
+  aufgabe: { html: aufgabeForm, ansichten: ['arbeit', 'loesung'] },
+  jahr: { html: jahrForm, ansichten: ['jahr-arbeit', 'jahr-loesung'] },
 };
-const formHtml = (fall, r, schritt) => SCHRITTE[schritt].html(fall, r);
 
 export function createEditor(app) {
   const root = $('#view-editor');
   const formHost = $('#editor-form');
+  const linksHost = $('#editor-darstellung');
   const slipHost = $('#slip-host');
   const dlg = $('#dlg-feld');
   let fall = null;
@@ -229,6 +251,7 @@ export function createEditor(app) {
   const pagesHost = $('#pages-host');
   let pane = 'zettel';
   let schritt = 'zettel';
+  const postenOffen = new Set(); // Posten mit aufgeklappten weiteren Angaben
 
   const result = () => berechne(fall);
 
@@ -241,14 +264,13 @@ export function createEditor(app) {
       pagesHost.innerHTML = renderSeiten(fall, { modus: pane, interactive: true });
       fitPages(pagesHost);
       const ueber = pagesHost.querySelectorAll('.page.is-overflow').length;
-      $('#pane-hint').textContent = `${PANE_HINWEIS[pane]}${ueber ? ' Achtung: Rot umrandete Seiten sind zu voll – weniger Teilaufgaben oder weniger Zeilen wählen.' : ''}`;
+      $('#pane-hint').textContent = `${PANE_HINWEIS[pane]}${ueber ? ' Rot umrandete Seiten sind zu voll.' : ''}`;
     }
     fitSlip();
   }
 
   function fitSlip() {
-    const avail = $('#editor-preview').clientWidth - 24;
-    const scale = Math.min(MAX_ZOOM, Math.max(0.3, avail / SLIP_WIDTH));
+    const scale = ganzeSeiteZoom($('#editor-preview'), pane === 'zettel' ? slipHost : pagesHost);
     slipHost.style.zoom = String(scale);
     pagesHost.style.zoom = String(scale);
   }
@@ -315,12 +337,9 @@ export function createEditor(app) {
   formHost.setAttribute('role', 'tabpanel');
 
   function renderForm() {
-    const open = new Map([...formHost.querySelectorAll('details')].map((d) => [d.querySelector('summary').textContent, d.open]));
-    formHost.innerHTML = formHtml(fall, result(), schritt);
-    formHost.querySelectorAll('details').forEach((d) => {
-      const key = d.querySelector('summary').textContent;
-      if (open.has(key)) d.open = open.get(key);
-    });
+    const r = result();
+    linksHost.innerHTML = darstellungForm(fall);
+    formHost.innerHTML = SCHRITTE[schritt].html(fall, r, postenOffen);
   }
 
   function persist() {
@@ -355,10 +374,18 @@ export function createEditor(app) {
     if (!block || block.contains(document.activeElement)) return;
     block.outerHTML = satzAuswahl(fall, result());
   }
+  /** Die Summen der Posten-Tabelle laufen beim Tippen mit. */
+  function postenSummenErneuern() {
+    const { werte } = result();
+    for (const el of formHost.querySelectorAll('[data-betrag]')) el.textContent = fmtCents(werte[el.dataset.betrag] ?? 0);
+  }
   const changed = ({ form = false } = {}) => {
     satzNachfuehren();
     if (form) renderForm();
-    else satzBlockErneuern();
+    else {
+      satzBlockErneuern();
+      postenSummenErneuern();
+    }
     renderSlipNow();
     scheduleSave();
   };
@@ -372,7 +399,8 @@ export function createEditor(app) {
     return parseScaled(el.value, 100);
   }
 
-  formHost.addEventListener('input', (e) => {
+  const aufFormular = (art, fn) => [formHost, linksHost].forEach((h) => h.addEventListener(art, fn));
+  aufFormular('input', (e) => {
     const text = e.target.closest('[data-action="sachtext"],[data-action="teiltext"]');
     if (text) {
       if (text.dataset.action === 'sachtext') fall.aufgabe.sachtext = text.value.trim() ? text.value : null;
@@ -389,7 +417,7 @@ export function createEditor(app) {
     changed();
   });
 
-  formHost.addEventListener('change', (e) => {
+  aufFormular('change', (e) => {
     const el = e.target.closest('[data-bind],[data-action="typ"],[data-action="gesucht"],[data-action="rueck-typ"],[data-action="rueck-param"]');
     if (!el) return;
     if (el.dataset.action === 'rueck-typ') {
@@ -448,10 +476,14 @@ export function createEditor(app) {
     Object.assign(fall, clean);
   }
 
-  formHost.addEventListener('click', (e) => {
+  aufFormular('click', (e) => {
     const btn = e.target.closest('[data-action]');
     if (!btn || btn.tagName === 'SELECT') return;
-    if (btn.dataset.action === 'satz-tabelle') {
+    if (btn.dataset.action === 'posten-mehr') {
+      const id = btn.dataset.id;
+      if (!postenOffen.delete(id)) postenOffen.add(id);
+      renderForm();
+    } else if (btn.dataset.action === 'satz-tabelle') {
       setzeSteuersatz(fall);
       changed({ form: true });
     } else if (btn.dataset.action === 'sach-auto') {

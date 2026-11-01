@@ -1,10 +1,10 @@
 /* Drucken: nur die gerade gezeigte Ansicht (Zettel oder Seiten des Arbeits-/Lösungsblatts), A4 hoch. */
 @page { size: A4 portrait; margin: 0; }
 body { background: #fff; padding: 0; }
-.banner, .toast, #view-library, dialog, .edbar, .ed-form, .hint, .pane-bar { display: none !important; }
+.banner, .toast, #view-library, dialog, .edbar, .ed-links, .ed-rechts, .hint, .pane-bar { display: none !important; }
 body[data-view='editor'] #view-editor { display: block !important; }
-.ed-body { display: block; }
-.ed-preview { padding: 0; overflow: visible; }
+.ed-body { display: block; height: auto; }
+.ed-preview { padding: 0; overflow: visible; height: auto; }
 .val.is-override { background: none !important; box-shadow: none !important; }
 
 /* Zettel allein */
@@ -13,7 +13,7 @@ body[data-view='editor'] #view-editor { display: block !important; }
 
 /* Seiten (Arbeits-/Lösungsblatt, Jahresübersicht, Mischblatt) */
 body[data-view='misch'] #view-misch { display: block !important; }
-#mi-form, #mi-hint { display: none !important; }
+#mi-hint { display: none !important; }
 #pages-host, #mi-pages { zoom: 1 !important; width: 794px; margin: 0; }
 .page { margin: 0 !important; box-shadow: none; break-after: page; page-break-after: always; }
 .page:last-child { break-after: auto; page-break-after: auto; }

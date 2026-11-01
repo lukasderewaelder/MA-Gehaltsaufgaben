@@ -53,12 +53,6 @@
     <header class="edbar">
       <button type="button" id="ed-back" class="btn" aria-label="Zurück zur Übersicht">← Übersicht</button>
       <input id="ed-titel" class="ed-titel" type="text" aria-label="Titel des Zettels" autocomplete="off">
-      <div id="ed-steps" class="steps" role="tablist" aria-label="Schritt">
-        <button type="button" role="tab" data-schritt="zettel" aria-selected="true">Zettel</button>
-        <button type="button" role="tab" data-schritt="aufgabe" aria-selected="false" tabindex="-1">Aufgabe</button>
-        <button type="button" role="tab" data-schritt="jahr" aria-selected="false" tabindex="-1">Jahr</button>
-        <button type="button" role="tab" data-schritt="aussehen" aria-selected="false" tabindex="-1">Aussehen</button>
-      </div>
       <span class="spacer"></span>
       <button type="button" id="ed-wuerfeln" class="btn" title="Gleiche Einstellungen, neuer Zufall" hidden>Neu würfeln</button>
       <button type="button" id="ed-present" class="btn">Vorführen</button>
@@ -73,6 +67,7 @@
       </details>
     </header>
     <div class="ed-body">
+      <aside id="editor-darstellung" class="ed-links" aria-label="Darstellung"></aside>
       <section id="editor-preview" class="ed-preview" aria-label="Vorschau">
         <div class="pane-bar" role="tablist" aria-label="Ansicht">
           <button type="button" role="tab" data-pane="zettel" aria-selected="true">Zettel</button>
@@ -85,7 +80,14 @@
         <div id="slip-host"></div>
         <div id="pages-host"></div>
       </section>
-      <aside id="editor-form" class="ed-form" aria-label="Einstellungen"></aside>
+      <section class="ed-rechts" aria-label="Inhalt">
+        <div id="ed-steps" class="steps" role="tablist" aria-label="Inhalt">
+          <button type="button" role="tab" data-schritt="zettel" aria-selected="true">Zettel</button>
+          <button type="button" role="tab" data-schritt="aufgabe" aria-selected="false" tabindex="-1">Aufgabe</button>
+          <button type="button" role="tab" data-schritt="jahr" aria-selected="false" tabindex="-1">Jahr</button>
+        </div>
+        <div id="editor-form" class="ed-form"></div>
+      </section>
     </div>
   </div>
 
@@ -132,6 +134,7 @@
       <button type="button" id="mi-pdf" class="btn btn-primary">PDF erstellen …</button>
     </header>
     <div class="ed-body">
+      <aside id="mi-links" class="ed-links" aria-label="Blatt"></aside>
       <section id="mi-preview" class="ed-preview" aria-label="Vorschau">
         <div class="pane-bar" role="tablist" aria-label="Ansicht">
           <button type="button" role="tab" id="mtab-arbeit" data-mpane="arbeit" aria-selected="true">Arbeitsblatt</button>
@@ -140,7 +143,7 @@
         <p id="mi-hint" class="hint" aria-live="polite"></p>
         <div id="mi-pages" role="tabpanel"></div>
       </section>
-      <aside id="mi-form" class="ed-form" aria-label="Einstellungen"></aside>
+      <section class="ed-rechts" aria-label="Aufgaben"><div id="mi-form" class="ed-form"></div></section>
     </div>
   </div>
 

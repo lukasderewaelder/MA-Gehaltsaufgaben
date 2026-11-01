@@ -9,13 +9,8 @@ import { useApp } from './helpers.mjs';
 
 const app = useApp();
 const wert = (page, id) => page.locator(`#slip-host .val[data-feld="${id}"]`).textContent();
-const SCHRITT_VON_BEREICH = { Arbeitsblatt: 'aufgabe', 'Gesuchte Werte': 'aufgabe', Texte: 'aufgabe', Jahresübersicht: 'jahr', 'Aussehen und weitere Blöcke': 'aussehen' };
-/** Wählt den Schritt des Bereichs (oben) und klappt den Bereich (z. B. „Arbeitsblatt“) auf, falls er zu ist. */
-const bereich = async (page, name) => {
-  await page.click(`#ed-steps [data-schritt="${SCHRITT_VON_BEREICH[name] ?? 'zettel'}"]`);
-  const details = page.locator('#editor-form details', { has: page.locator(`summary:text-is("${name}")`) });
-  if (!(await details.evaluate((d) => d.open))) await details.locator('summary').click();
-};
+/** Wählt den Reiter im rechten Bereich: 'zettel', 'aufgabe' oder 'jahr'. */
+const reiter = (page, name) => page.click(`#ed-steps [data-schritt="${name}"]`);
 const keineProbleme = (problems, foreign) => {
   assert.deepEqual(problems, [], `Konsolenfehler: ${problems.join(' | ')}`);
   assert.deepEqual(foreign, [], `Fremde Anfragen: ${foreign.join(' | ')}`);
@@ -154,7 +149,7 @@ test('Zufallsfall mit zwei Gruppen, Neu würfeln mit Rückgängig', async () => 
 test('Rückwärtsaufgaben: ohne Zettel (Netto und Quote) und mit Lücken im Zettel (Beitrag)', async () => {
   const { context, page, problems, foreign } = await app.openApp();
   await app.neuerZettel(page);
-  await bereich(page, 'Arbeitsblatt');
+  await reiter(page, 'aufgabe');
   await page.selectOption('[data-action="rueck-typ"]', 'quote');
   await page.click('[data-pane="arbeit"]');
   await page.waitForSelector('#pages-host .page');
@@ -219,7 +214,7 @@ test('Jahresübersicht: Lücken, Lösung, Vergleich', async () => {
   assert.ok(await page.locator('#pages-host svg.diagramm').count());
   await page.click('[data-pane="jahr-loesung"]');
   assert.equal(await page.locator('#pages-host .val.loesung').count(), 27);
-  await bereich(page, 'Jahresübersicht');
+  await reiter(page, 'jahr');
   await page.selectOption('[data-bind="jahresblatt.vergleich"]', 'klassen');
   assert.ok(await page.locator('#pages-host .vergleich').count());
   assert.equal(await page.locator('#pages-host .page.is-overflow').count(), 0, 'Seite passt');
@@ -407,7 +402,6 @@ test('Sehr einfach: Felder entfallen, Beiblatt erklärt mit kleiner Satz-Tabelle
   for (const id of ['stBrutto', 'kvBrutto', 'rvBrutto', 'avBrutto', 'pvBrutto']) assert.ok(ids.includes(id), `normal: ${id}`);
   assert.ok(await page.locator('#slip-host thead th:text-is("St")').count());
 
-  await bereich(page, 'Aussehen und weitere Blöcke');
   await page.check('[data-bind="anzeige.einfach"]');
   ids = await felder();
   for (const id of ['stBrutto', 'kvBrutto', 'rvBrutto', 'avBrutto', 'pvBrutto', 'soli']) assert.ok(!ids.includes(id), `einfach: ${id}`);
@@ -431,7 +425,7 @@ test('Sehr einfach: Felder entfallen, Beiblatt erklärt mit kleiner Satz-Tabelle
   assert.ok(aufgaben.length >= 5 && aufgaben.every((t) => !t.includes('KV-Brutto')));
 
   // Steuersatz in der Tabelle ablesen: der Satz steht nicht mehr im Text
-  await bereich(page, 'Lohnsteuer');
+  await reiter(page, 'zettel');
   await page.click('#pages-host .val[data-feld="lst"]'); // Lohnsteuer als gesucht markieren
   const imText = await page.locator('#pages-host .teil .tt', { hasText: 'Lohnsteuer' }).first().textContent();
   assert.match(imText, /Der Steuersatz ist \d+,\d %\. Rechne \d+,\d % vom Brutto\./);

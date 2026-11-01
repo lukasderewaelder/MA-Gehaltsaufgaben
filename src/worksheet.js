@@ -340,6 +340,16 @@ export function versuche(modus, plan) {
   return `<table class="mz versuche"><thead><tr><th class="r">Brutto (€)</th><th class="r">Netto (€)</th><th class="r">Ziel ${fmtCents(plan.ziel)} € erreicht?</th></tr></thead><tbody>${zeilen}</tbody></table>`;
 }
 
+/** Zoom der Vorschau: breit genug für die Spalte; bei drei Spalten (ab 1100 px) passt die ganze Seite in die Höhe. */
+export function ganzeSeiteZoom(preview, host) {
+  let zoom = (preview.clientWidth - 24) / PAGE_W;
+  if (matchMedia('(min-width: 1100px)').matches) {
+    const oben = host.getBoundingClientRect().top - preview.getBoundingClientRect().top + preview.scrollTop;
+    zoom = Math.min(zoom, (preview.clientHeight - oben - 12) / PAGE_H);
+  }
+  return Math.min(1.3, Math.max(0.3, zoom));
+}
+
 /** Passt den Zettel auf jeder Seite in den freien Platz (verkleinert bis 55 %); markiert Seiten, auf denen es nicht reicht. */
 export function fitPages(root) {
   for (const page of root.querySelectorAll('.page')) {
